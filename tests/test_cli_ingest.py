@@ -250,6 +250,18 @@ def test_reimporting_idless_file_adds_no_duplicates(tmp_path: Path) -> None:
     assert stored_count() == 2
 
 
+def test_same_id_from_two_sources_is_two_reviews(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"1,2026-11-10,5,Great,web\n1,2026-11-10,2,Slow,app\n")
+
+    first = runner.invoke(app, ["ingest", str(path)])
+    second = runner.invoke(app, ["ingest", str(path)])
+
+    assert "New: 2" in first.output
+    assert "New: 0" in second.output
+    assert "Already stored: 2" in second.output
+    assert stored_count() == 2
+
+
 def test_committed_sample_is_idempotent() -> None:
     first = runner.invoke(app, ["ingest", str(SAMPLE_CSV)])
     second = runner.invoke(app, ["ingest", str(SAMPLE_CSV)])

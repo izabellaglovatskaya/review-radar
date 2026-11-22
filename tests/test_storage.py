@@ -9,7 +9,7 @@ import pytest
 
 from review_radar import storage
 from review_radar.hashing import text_hash
-from review_radar.models import Review
+from review_radar.models import UNKNOWN_SOURCE, Review
 from review_radar.storage import (
     APPLICATION_ID,
     SCHEMA_VERSION,
@@ -60,8 +60,19 @@ class TestConnect:
                 r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
             ]
 
-        assert version == SCHEMA_VERSION == 1
+        assert version == SCHEMA_VERSION == 2
         assert "reviews" in tables
+
+    def test_stage_3_database_is_rejected_with_a_recreate_hint(self, tmp_path: Path) -> None:
+        path = db_path(tmp_path)
+        with contextlib.closing(sqlite3.connect(path)) as raw:
+            raw.execute("CREATE TABLE reviews (x INTEGER)")
+            raw.execute(f"PRAGMA application_id = {APPLICATION_ID}")
+            raw.execute("PRAGMA user_version = 1")
+            raw.commit()
+
+        with pytest.raises(StorageError, match=r"version 1, expected 2.*run ingest again"):
+            connect(path)
 
     def test_creates_parent_directories(self, tmp_path: Path) -> None:
         path = tmp_path / "a" / "b" / "radar.db"
@@ -88,7 +99,7 @@ class TestConnect:
         with contextlib.closing(sqlite3.connect(path)) as raw:
             raw.execute("PRAGMA user_version = 7")
 
-        with pytest.raises(StorageError, match=r"7.*1"):
+        with pytest.raises(StorageError, match=r"7, expected 2"):
             connect(path)
 
     def test_foreign_database_is_rejected(self, tmp_path: Path) -> None:
@@ -134,7 +145,8 @@ class TestSchemaInit:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         good = storage._SCHEMA
-        broken = good.replace("PRAGMA user_version = 1;", "SELECT * FROM no_such_table;")
+        broken = good.replace("PRAGMA user_version = 2;", "SELECT * FROM no_such_table;")
+        assert broken != good
         monkeypatch.setattr(storage, "_SCHEMA", broken)
 
         with pytest.raises(StorageError):
@@ -161,7 +173,7 @@ class TestSchemaInit:
         path = db_path(tmp_path)
         with contextlib.closing(sqlite3.connect(path)) as raw:
             raw.execute("CREATE TABLE reviews (x INTEGER)")
-            raw.execute("PRAGMA user_version = 1")
+            raw.execute("PRAGMA user_version = 2")
             raw.commit()
 
         with pytest.raises(StorageError, match="not a Review Radar database"):
@@ -246,13 +258,20 @@ class TestSaveReviews:
 
         result = save(
             db_path(tmp_path),
-            [make_review(external_id="r1", text="changed", rating=1, source="app")],
+            [make_review(external_id="r1", text="changed", rating=1, source="WEB")],
         )
 
         assert result == SaveResult(new=0, existing=1)
         with contextlib.closing(connect(db_path(tmp_path))) as conn:
             (stored,) = list_reviews(conn)
         assert (stored.text, stored.rating, stored.source) == ("original", 5, "web")
+
+    def test_same_id_from_another_source_is_stored_separately(self, tmp_path: Path) -> None:
+        save(db_path(tmp_path), [make_review(external_id="r1", source="web")])
+
+        result = save(db_path(tmp_path), [make_review(external_id="r1", source="app")])
+
+        assert result == SaveResult(new=1, existing=0)
 
     def test_optional_fields_round_trip(self, tmp_path: Path) -> None:
         review = make_review(rating=None, source=None)
@@ -278,7 +297,7 @@ class TestSaveReviews:
             ).fetchone()
 
         assert row == (
-            "id:r1",
+            'id:["web","r1"]',
             "r1",
             "2026-11-10",
             text_hash("Hello"),
@@ -335,14 +354,37 @@ class TestSaveReviews:
 
 
 class TestDedupKey:
-    def test_id_form(self) -> None:
-        assert dedup_key(make_review(external_id="r1")) == "id:r1"
+    def test_id_form_is_scoped_by_source(self) -> None:
+        assert dedup_key(make_review(external_id="r1")) == 'id:["web","r1"]'
 
-    def test_id_form_ignores_other_fields(self) -> None:
-        a = make_review(external_id="r1", text="a")
-        b = make_review(external_id="r1", text="b", source="app")
+    def test_id_form_ignores_text_date_and_rating(self) -> None:
+        a = make_review(external_id="r1", text="a", rating=1)
+        b = make_review(external_id="r1", text="b", rating=5, review_date=dt.date(2026, 1, 1))
 
         assert dedup_key(a) == dedup_key(b)
+
+    def test_same_id_from_another_source_is_a_different_review(self) -> None:
+        assert dedup_key(make_review(external_id="r1", source="web")) != dedup_key(
+            make_review(external_id="r1", source="app")
+        )
+
+    def test_source_case_does_not_matter_for_the_id_key(self) -> None:
+        assert dedup_key(make_review(external_id="r1", source="Web")) == dedup_key(
+            make_review(external_id="r1", source="web")
+        )
+
+    def test_missing_source_uses_unknown(self) -> None:
+        assert UNKNOWN_SOURCE == "unknown"
+        assert dedup_key(make_review(external_id="r1", source=None)) == 'id:["unknown","r1"]'
+        assert dedup_key(make_review(external_id="r1", source=None)) == dedup_key(
+            make_review(external_id="r1", source="unknown")
+        )
+
+    def test_id_and_source_boundary_cannot_collide(self) -> None:
+        a = make_review(external_id='b"]', source="a")
+        b = make_review(external_id="b", source='a"]')
+
+        assert dedup_key(a) != dedup_key(b)
 
     def test_hash_form(self) -> None:
         key = dedup_key(make_review())

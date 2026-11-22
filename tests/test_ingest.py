@@ -390,8 +390,8 @@ class TestFileErrors:
             HEADER
             + b"r1,2026-11-10,5,First,web\n"
             + b"r2,2026-11-10,5,Other,web\n"
-            + b"r1,2026-11-11,1,Second,app\n"
-            + b" r1 ,2026-11-11,1,Third,app\n"
+            + b"r1,2026-11-11,1,Second,web\n"
+            + b" r1 ,2026-11-11,1,Third,WEB\n"
         )
 
         result = read_reviews(write(tmp_path, content))
@@ -846,6 +846,14 @@ class TestContentDuplicates:
         assert reasons(read_reviews(write(tmp_path, content))) == [
             (3, RowErrorReason.DUPLICATE_REVIEW_ID)
         ]
+
+    def test_same_id_from_different_sources_are_both_kept(self, tmp_path: Path) -> None:
+        content = HEADER + b"r1,2026-11-10,5,A,web\nr1,2026-11-10,5,B,app\n"
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert len(result.reviews) == 2
+        assert result.errors == ()
 
     def test_same_content_with_and_without_id_are_both_kept(self, tmp_path: Path) -> None:
         content = HEADER + b"r1,2026-11-10,5,A,web\n,2026-11-10,5,A,web\n"

@@ -1,6 +1,7 @@
 """Domain models shared by ingest, analysis, storage and reporting."""
 
 import datetime as dt
+import json
 import logging
 from enum import StrEnum
 from typing import Annotated, Any, Self
@@ -122,8 +123,17 @@ class Usage(BaseModel):
         )
 
 
+UNKNOWN_SOURCE = "unknown"
+
+
 def dedup_key(review: Review) -> str:
-    """Return the idempotency key: the external id if set, else a content hash."""
+    """Return the idempotency key.
+
+    With an external id: the id scoped by source (casefolded; a missing source counts as
+    `UNKNOWN_SOURCE`), encoded as a JSON array so no id/source pair can collide with another.
+    Without one: a hash of date + normalized text + source.
+    """
     if review.external_id is not None:
-        return f"id:{review.external_id}"
+        source = (review.source or UNKNOWN_SOURCE).casefold()
+        return "id:" + json.dumps([source, review.external_id], separators=(",", ":"))
     return "hash:" + content_hash(review.review_date, review.text, review.source)

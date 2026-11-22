@@ -93,8 +93,9 @@ def read_reviews(
 
     Raises IngestError for file-level problems (unreadable, wrong encoding, empty, no data
     rows, missing required columns, bare CR line breaks, unrecoverable malformed CSV).
-    Row-level problems are returned in `IngestResult.errors`. When a review_id occurs more
-    than once, the first valid occurrence is imported and later ones are skipped.
+    Row-level problems are returned in `IngestResult.errors`. Rows with the same `dedup_key`
+    (the same review_id from the same source, or the same content without an id) are
+    imported once: the first valid occurrence wins and later ones are skipped.
     """
     if delimiter is not None and delimiter not in _ALLOWED_DELIMITERS:
         raise IngestError("The delimiter must be one of: comma, semicolon, tab, pipe.")

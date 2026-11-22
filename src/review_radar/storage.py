@@ -4,8 +4,12 @@ Privacy rule: `StorageError` messages never contain review text. Every statement
 placeholders; SQL is never built from data. The schema version lives in `PRAGMA
 user_version`; there are no migrations yet, so a database with another version is rejected.
 
-Re-importing is idempotent: every review has a `dedup_key` (its external id, or a hash of
-date + normalized text + source) and the first stored copy of a key is never modified.
+Re-importing is idempotent: every review has a `dedup_key` (its external id scoped by source,
+or a hash of date + normalized text + source) and the first stored copy of a key is never
+modified.
+
+Schema versions: 1 (stage 3) keyed reviews by external id alone; 2 scopes the id by source.
+A version 1 database cannot be upgraded in place and must be recreated from the CSV.
 """
 
 import datetime as dt
@@ -20,7 +24,7 @@ from review_radar.models import Review, dedup_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 APPLICATION_ID = 0x52765264  # ASCII "RvRd"
 
 _SCHEMA = """
@@ -38,7 +42,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_review_date ON reviews (review_date);
 PRAGMA application_id = 1383486052;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 COMMIT;
 """
 
@@ -102,7 +106,10 @@ def _ensure_schema(conn: sqlite3.Connection, path: Path) -> None:
             raise StorageError(f"{path.name} is not a Review Radar database.")
         conn.executescript(_SCHEMA)  # one transaction: all or nothing
     elif version != SCHEMA_VERSION:
-        raise StorageError(f"{path.name} has schema version {version}, expected {SCHEMA_VERSION}.")
+        hint = " Delete it and run ingest again." if version < SCHEMA_VERSION else ""
+        raise StorageError(
+            f"{path.name} has schema version {version}, expected {SCHEMA_VERSION}.{hint}"
+        )
     elif application_id != APPLICATION_ID:
         raise StorageError(f"{path.name} is not a Review Radar database.")
 
