@@ -1,5 +1,6 @@
 """Text normalization and hashing used for deduplication and the analysis cache."""
 
+import datetime as dt
 import hashlib
 import json
 import re
@@ -38,3 +39,12 @@ def cache_key(text: str, *, provider: str, model: str, prompt_version: str) -> s
     _require_non_blank("model", model)
     _require_non_blank("prompt_version", prompt_version)
     return _sha256_hex(json.dumps([text_hash(text), provider, model, prompt_version]))
+
+
+def content_hash(review_date: dt.date, text: str, source: str | None) -> str:
+    """Return a digest identifying a review by its content (date, normalized text, source).
+
+    Used as the dedup key for reviews without an id. The parts are encoded as a JSON
+    array, so no choice of values can make two different tuples produce the same input.
+    """
+    return _sha256_hex(json.dumps([review_date.isoformat(), text_hash(text), source]))

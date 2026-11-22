@@ -1,10 +1,11 @@
+import datetime as dt
 import hashlib
 import json
 import unicodedata
 
 import pytest
 
-from review_radar.hashing import cache_key, normalize_text, text_hash
+from review_radar.hashing import cache_key, content_hash, normalize_text, text_hash
 
 
 class TestNormalize:
@@ -96,3 +97,25 @@ class TestCacheKey:
     def test_blank_rejected(self, field: str, name: str, bad: str) -> None:
         with pytest.raises(ValueError, match=f"{name} must not be empty"):
             key(**{field: bad})
+
+
+class TestContentHash:
+    DAY = dt.date(2026, 11, 10)
+
+    def test_matches_documented_encoding(self) -> None:
+        expected = hashlib.sha256(
+            json.dumps(["2026-11-10", text_hash("Hello"), "web"]).encode("utf-8")
+        ).hexdigest()
+
+        assert content_hash(self.DAY, "Hello", "web") == expected
+
+    def test_text_is_normalized(self) -> None:
+        assert content_hash(self.DAY, " HELLO  world ", None) == content_hash(
+            self.DAY, "hello world", None
+        )
+
+    def test_none_source_is_distinct_from_string(self) -> None:
+        assert content_hash(self.DAY, "a", None) != content_hash(self.DAY, "a", "None")
+
+    def test_parts_cannot_collide(self) -> None:
+        assert content_hash(self.DAY, "a|b", "c") != content_hash(self.DAY, "a", "b|c")

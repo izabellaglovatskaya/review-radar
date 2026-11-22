@@ -24,11 +24,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from review_radar.models import Review
+from review_radar.models import MAX_EXTERNAL_ID_LENGTH, MAX_SOURCE_LENGTH, Review, dedup_key
 
 logger = logging.getLogger(__name__)
 
 MAX_TEXT_LENGTH = 2000
+MAX_FILE_BYTES = 20 * 1024 * 1024
 REQUIRED_COLUMNS = ("review_date", "text")
 OPTIONAL_COLUMNS = ("review_id", "rating", "source")
 _DETECTED_DELIMITERS = (",", ";")
@@ -36,6 +37,9 @@ _ALLOWED_DELIMITERS = (",", ";", "\t", "|")
 _MAX_IGNORED_NAME_LENGTH = 40
 _BLANK_COLUMN = "(blank)"
 _RECOVERABLE_CSV_ERROR = "',' expected after"
+_FIELD_LIMIT_CSV_ERROR = "field larger than field limit"
+_BOM = "\ufeff"
+_MEGABYTE = 1024 * 1024
 
 _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _RATING = re.compile(r"[1-5]")
@@ -54,7 +58,10 @@ class RowErrorReason(StrEnum):
     INVALID_RATING = "invalid_rating"
     WRONG_FIELD_COUNT = "wrong_field_count"
     MALFORMED_ROW = "malformed_row"
+    REVIEW_ID_TOO_LONG = "review_id_too_long"
+    SOURCE_TOO_LONG = "source_too_long"
     DUPLICATE_REVIEW_ID = "duplicate_review_id"
+    DUPLICATE_REVIEW = "duplicate_review"
 
 
 @dataclass(frozen=True)
@@ -96,15 +103,15 @@ def read_reviews(
     _reject_nul(text)
     _reject_bare_cr(text)
 
-    header_line = next((ln for ln in text.splitlines() if ln.strip()), None)
+    physical_lines = _physical_lines(text)
+    header_line = next((ln for ln in physical_lines if ln.strip()), None)
     if header_line is None:
         raise IngestError("The file is empty.")
     sep = delimiter or _detect_delimiter(header_line)
-    physical_lines = text.splitlines(keepends=True)
 
     reviews: list[Review] = []
     errors: list[RowError] = []
-    seen_ids: set[str] = set()
+    seen_keys: set[str] = set()
     rows_read = 0
     columns: dict[str, int] | None = None
     ignored: tuple[str, ...] = ()
@@ -121,7 +128,7 @@ def read_reviews(
         except csv.Error as exc:
             last_line = reader.line_num
             if columns is None or not _can_resume(exc, physical_lines, last_line):
-                raise IngestError(f"Malformed CSV at line {start_line}: {exc}.") from None
+                raise IngestError(_malformed_message(exc, start_line)) from None
             rows_read += 1
             errors.append(RowError(start_line, RowErrorReason.MALFORMED_ROW))
             continue
@@ -138,17 +145,17 @@ def read_reviews(
             continue
 
         rows_read += 1
+        row = _drop_trailing_blank_cells(row, header_width)
         if len(row) != header_width:
             errors.append(RowError(start_line, RowErrorReason.WRONG_FIELD_COUNT))
             continue
         outcome = _parse_row(row, columns)
         if isinstance(outcome, RowErrorReason):
             errors.append(RowError(start_line, outcome))
-        elif outcome.external_id is not None and outcome.external_id in seen_ids:
-            errors.append(RowError(start_line, RowErrorReason.DUPLICATE_REVIEW_ID))
+        elif (key := dedup_key(outcome)) in seen_keys:
+            errors.append(RowError(start_line, _duplicate_reason(outcome)))
         else:
-            if outcome.external_id is not None:
-                seen_ids.add(outcome.external_id)
+            seen_keys.add(key)
             reviews.append(outcome)
 
     if rows_read == 0:
@@ -164,6 +171,37 @@ def read_reviews(
     return result
 
 
+def _duplicate_reason(review: Review) -> RowErrorReason:
+    if review.external_id is not None:
+        return RowErrorReason.DUPLICATE_REVIEW_ID
+    return RowErrorReason.DUPLICATE_REVIEW
+
+
+def _physical_lines(text: str) -> list[str]:
+    """Split like `csv.reader` counts lines: only on CRLF and LF (bare CR is rejected earlier).
+
+    `str.splitlines()` also splits on U+2028, form feed and others, which would shift
+    every line index after such a character.
+    """
+    return io.StringIO(text, newline="").readlines()
+
+
+def _malformed_message(exc: csv.Error, start_line: int) -> str:
+    if str(exc).startswith(_FIELD_LIMIT_CSV_ERROR):
+        return (
+            f"A field starting at line {start_line} is too large "
+            f"(limit {csv.field_size_limit()} characters)."
+        )
+    return f"Malformed CSV at line {start_line}: {exc}."
+
+
+def _drop_trailing_blank_cells(row: list[str], width: int) -> list[str]:
+    """Drop blank cells beyond the header width (a trailing delimiter, e.g. Excel exports)."""
+    if len(row) > width and not any(cell.strip() for cell in row[width:]):
+        return row[:width]
+    return row
+
+
 def _can_resume(exc: csv.Error, physical_lines: list[str], line_num: int) -> bool:
     """True if reading can safely continue after `exc` (see the module docstring)."""
     if not str(exc).startswith(_RECOVERABLE_CSV_ERROR):
@@ -173,17 +211,27 @@ def _can_resume(exc: csv.Error, physical_lines: list[str], line_num: int) -> boo
 
 def _read_text(path: Path, encoding: str) -> str:
     try:
-        raw = path.read_bytes()
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_FILE_BYTES + 1)
+    except FileNotFoundError:
+        raise IngestError("Cannot read the file: No such file or directory.") from None
     except OSError as exc:
+        if isinstance(exc, IsADirectoryError) or (
+            isinstance(exc, PermissionError) and path.is_dir()
+        ):
+            raise IngestError(f"Not a file: {path.name}.") from None
         raise IngestError(f"Cannot read the file: {exc.strerror or type(exc).__name__}.") from None
+    if len(raw) > MAX_FILE_BYTES:
+        raise IngestError(f"The file is larger than {MAX_FILE_BYTES // _MEGABYTE} MB.")
     try:
-        return raw.decode(encoding)
+        text = raw.decode(encoding)
     except UnicodeDecodeError:
         raise IngestError(
             f"The file is not valid {encoding}. Pass another encoding, e.g. cp1251."
         ) from None
     except LookupError:
         raise IngestError(f"Unknown encoding {encoding!r}.") from None
+    return text.removeprefix(_BOM)
 
 
 def _reject_nul(text: str) -> None:
@@ -246,6 +294,10 @@ def _parse_row(row: list[str], columns: dict[str, int]) -> Review | RowErrorReas
     rating_raw = cell("rating")
     if rating_raw and not _RATING.fullmatch(rating_raw):
         return RowErrorReason.INVALID_RATING
+    if len(cell("review_id")) > MAX_EXTERNAL_ID_LENGTH:
+        return RowErrorReason.REVIEW_ID_TOO_LONG
+    if len(cell("source")) > MAX_SOURCE_LENGTH:
+        return RowErrorReason.SOURCE_TOO_LONG
 
     return Review(
         external_id=cell("review_id"),

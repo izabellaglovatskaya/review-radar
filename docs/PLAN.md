@@ -17,6 +17,7 @@ Input: a CSV file with reviews of a fictional company. Output:
 | LLM | Anthropic API behind a `Classifier` protocol. Default model `claude-haiku-5-5`. Key only in `.env`. |
 | Demo mode | `FixtureClassifier` with canned answers keyed by review hash, plus a deterministic keyword/rating fallback. No key, no network, no cost. |
 | Output format | Structured JSON per batch of 20 reviews, short ids (`r1…r20`), closed topic list, validated again with pydantic. |
+| Re-import key | `review_id` when present (globally unique across sources: the same id from another source counts as already stored; the first stored copy wins and later edits under the same id are ignored), else sha256 of date + normalized text + source. The same review exported once with and once without an id is stored twice. Known limitations, accepted. |
 | Cache | Analyses cached by (review hash, provider, model, prompt version). A rerun on the same CSV makes 0 calls. |
 | Telegram | Send only (no commands). Idempotent: one summary per date unless `--force`. `--dry-run` prints the message. |
 | Dashboard | Jinja2 template with embedded JSON and a vendored Chart.js. Output `site/index.html`, opens from disk. |
@@ -79,19 +80,34 @@ Recorded after each stage review; picked up in the stage named in brackets.
 
 ### Stage 2
 
-- `ingest.py`: no file-size cap before `read_bytes()`; add `MAX_FILE_BYTES` and raise `IngestError` above it [3].
-- `ingest.py`: a directory path gives "Permission denied" on Windows; check `is_file()` first and say "Not a file" [3].
-- `ingest.py`: with `--encoding utf-8` on a BOM file the error is a misleading "Missing required column"; strip a leading BOM after decoding [3].
-- `ingest.py`: a field over 131072 characters aborts the whole file; reword the message to say the field is too large [3].
-- `ingest.py`: the delimiter is sniffed with `str.splitlines()`, which splits on more characters than csv; use the first csv-parsed row [3].
-- `ingest.py`: a trailing delimiter on data rows (Excel `;` exports) makes every row `wrong_field_count`; consider tolerating trailing empty cells [3].
-- `models.py`: `external_id` and `source` have no length limit; add `max_length` before they reach the database [3].
+- ~~`ingest.py`: no file-size cap before `read_bytes()`; add `MAX_FILE_BYTES` and raise `IngestError` above it [3].~~ Done in stage 3.
+- ~~`ingest.py`: a directory path gives "Permission denied" on Windows; check `is_file()` first and say "Not a file" [3].~~ Done in stage 3.
+- ~~`ingest.py`: with `--encoding utf-8` on a BOM file the error is a misleading "Missing required column"; strip a leading BOM after decoding [3].~~ Done in stage 3.
+- ~~`ingest.py`: a field over 131072 characters aborts the whole file; reword the message to say the field is too large [3].~~ Done in stage 3.
+- ~~`ingest.py`: the delimiter is sniffed with `str.splitlines()`, which splits on more characters than csv~~ Done in stage 3: sniffed from the first csv physical line (CRLF/LF), not `str.splitlines()`; a quoted header cell with a line break is still not handled.
+- ~~`ingest.py`: a trailing delimiter on data rows (Excel `;` exports) makes every row `wrong_field_count`; consider tolerating trailing empty cells [3].~~ Done in stage 3.
+- ~~`models.py`: `external_id` and `source` have no length limit; add `max_length` before they reach the database [3].~~ Done in stage 3.
 - `ingest.py`: after a recoverable malformed row, a contrived tail with an even number of quotes that still opens a quoted field could leave a bogus continuation row; it is usually counted as `wrong_field_count`, but could be imported if it happens to be a valid row. Accepted risk; revisit if real exports hit it [any].
-- `cli.py`: `ingest` requires `--dry-run` until storage exists; make saving the default in stage 3 [3].
-- Storage: decide the idempotency key for re-imports (unique `external_id`, fallback hash of date + text + source for rows without an id) so re-running ingest never double-counts the daily summary [3].
+- ~~`cli.py`: `ingest` requires `--dry-run` until storage exists; make saving the default in stage 3 [3].~~ Done in stage 3.
+- ~~Storage: decide the idempotency key for re-imports (unique `external_id`, fallback hash of date + text + source for rows without an id) so re-running ingest never double-counts the daily summary [3].~~ Done in stage 3.
 - `MAX_TEXT_LENGTH` (2000 chars) is not tied to the token budget; revisit with the prompt [5].
 - Eval needs ground truth keyed by `review_id`, so it only runs on generator data; say so in the CLI help and README [8].
 - `scripts/generate_reviews.py`: `generate()` does not validate `n` and `days`; the two output files are not written atomically; the company name is hardcoded in one template [10].
 - `scripts/generate_reviews.py`, `ingest.py`: a few public classes and functions lack docstrings [any].
 - `tests/test_generate_reviews.py`: `import random` inside a test function [any].
 - README: explain that ratings are deliberately noisy against sentiment, so a rating-based fallback scores lower in eval [10].
+
+### Stage 3
+
+- `storage.py`: `count_reviews` / `list_reviews` do not wrap `sqlite3.Error` / `ValidationError` in `StorageError`; wrap them before a CLI caller uses them (pydantic messages can contain review text) [4].
+- `storage.py`: a locked or read-only database is reported as "Cannot use ... as a database"; special-case locked/readonly messages and set `busy_timeout` [6].
+- `storage.py`: a naive `now` is stored without a timezone; require aware datetimes or convert to UTC [4].
+- `storage.py`: no option to report "same id, different content" on re-import [any].
+- `models.py`: `MAX_TEXT_LENGTH` lives in ingest; move it to `Review.text` `max_length` like the id/source limits [5].
+- `ingest.py`: the 20 MB cap does not bound the row count / memory for millions of tiny rows; consider a row cap or capped error list [any].
+- `ingest.py`: a UTF-8 BOM file read with `--encoding cp1251` still gives "Missing required column"; detect the raw BOM and suggest the default encoding [any].
+- `cli.py`: exit code is 0 even when most rows were skipped; consider `--strict` [8].
+- `storage.py`: the database file holds review text and is created with default permissions; chmod 0o600 on POSIX [9].
+- Tests: the real-db guard relies only on the `DATABASE_PATH` env fixture; add a check that fails if a test resolves to `data/review_radar.db` [any].
+- `storage.py`: `PRAGMA foreign_keys = ON` and its test are unused until a foreign key exists [4].
+- Tests: `test_corrupt_database_is_a_clean_error` does not assert the file name in the message [any].

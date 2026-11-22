@@ -14,9 +14,13 @@ from pydantic import (
     field_validator,
 )
 
+from review_radar.hashing import content_hash
+
 logger = logging.getLogger(__name__)
 
 MAX_TOPICS = 3
+MAX_EXTERNAL_ID_LENGTH = 128
+MAX_SOURCE_LENGTH = 64
 
 
 class Sentiment(StrEnum):
@@ -58,11 +62,11 @@ def parse_topic(value: Any) -> Topic:
 class Review(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    external_id: str | None
+    external_id: Annotated[str, Field(max_length=MAX_EXTERNAL_ID_LENGTH)] | None
     review_date: dt.date
     rating: Annotated[StrictInt, Field(ge=1, le=5)] | None
     text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    source: str | None
+    source: Annotated[str, Field(max_length=MAX_SOURCE_LENGTH)] | None
 
     @field_validator("external_id", "source", mode="before")
     @classmethod
@@ -116,3 +120,10 @@ class Usage(BaseModel):
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
         )
+
+
+def dedup_key(review: Review) -> str:
+    """Return the idempotency key: the external id if set, else a content hash."""
+    if review.external_id is not None:
+        return f"id:{review.external_id}"
+    return "hash:" + content_hash(review.review_date, review.text, review.source)

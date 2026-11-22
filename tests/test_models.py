@@ -4,7 +4,16 @@ import logging
 import pytest
 from pydantic import ValidationError
 
-from review_radar.models import Analysis, Review, Sentiment, Topic, Usage, parse_topic
+from review_radar.models import (
+    MAX_EXTERNAL_ID_LENGTH,
+    MAX_SOURCE_LENGTH,
+    Analysis,
+    Review,
+    Sentiment,
+    Topic,
+    Usage,
+    parse_topic,
+)
 
 D = dt.date(2025, 1, 15)
 
@@ -96,6 +105,26 @@ class TestReview:
         r = make_review(external_id="  r1 ", source=" web ")
         assert r.external_id == "r1"
         assert r.source == "web"
+
+    def test_length_limits_are_the_documented_values(self) -> None:
+        assert (MAX_EXTERNAL_ID_LENGTH, MAX_SOURCE_LENGTH) == (128, 64)
+
+    def test_external_id_and_source_at_the_limit_are_accepted(self) -> None:
+        r = make_review(external_id="i" * MAX_EXTERNAL_ID_LENGTH, source="s" * MAX_SOURCE_LENGTH)
+        assert len(r.external_id or "") == MAX_EXTERNAL_ID_LENGTH
+        assert len(r.source or "") == MAX_SOURCE_LENGTH
+
+    def test_padded_value_at_the_limit_is_accepted_after_strip(self) -> None:
+        r = make_review(external_id=" " + "i" * MAX_EXTERNAL_ID_LENGTH + " ")
+        assert r.external_id == "i" * MAX_EXTERNAL_ID_LENGTH
+
+    @pytest.mark.parametrize(
+        ("field", "limit"),
+        [("external_id", MAX_EXTERNAL_ID_LENGTH), ("source", MAX_SOURCE_LENGTH)],
+    )
+    def test_over_limit_is_rejected(self, field: str, limit: int) -> None:
+        with pytest.raises(ValidationError):
+            make_review(**{field: "x" * (limit + 1)})
 
     def test_bad_date_rejected(self) -> None:
         with pytest.raises(ValidationError):

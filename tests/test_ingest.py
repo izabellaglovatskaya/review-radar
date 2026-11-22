@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from review_radar import ingest
 from review_radar.ingest import (
+    MAX_FILE_BYTES,
     MAX_TEXT_LENGTH,
     IngestError,
     IngestResult,
@@ -12,6 +14,7 @@ from review_radar.ingest import (
     RowErrorReason,
     read_reviews,
 )
+from review_radar.models import MAX_EXTERNAL_ID_LENGTH, MAX_SOURCE_LENGTH
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_CSV = REPO_ROOT / "data" / "sample" / "reviews.csv"
@@ -469,7 +472,7 @@ class TestFileErrors:
             read_reviews(tmp_path / "nope.csv")
 
     def test_directory_instead_of_file(self, tmp_path: Path) -> None:
-        with pytest.raises(IngestError, match="read"):
+        with pytest.raises(IngestError, match="Not a file"):
             read_reviews(tmp_path)
 
     def test_cp1251_bytes_with_default_encoding(self, tmp_path: Path) -> None:
@@ -499,8 +502,12 @@ class TestFileErrors:
         huge = b"a" * 200_000
         content = HEADER + b"r1,2026-11-10,5,Fine,web\nr2,2026-11-10,5," + huge + b",web\n"
 
-        with pytest.raises(IngestError, match="line 3"):
+        with pytest.raises(IngestError) as excinfo:
             read_reviews(write(tmp_path, content))
+        message = str(excinfo.value)
+        assert "line 3" in message
+        assert "too large" in message
+        assert "131072" in message
 
     def test_unterminated_quote_is_an_error_not_a_swallowed_file(self, tmp_path: Path) -> None:
         content = HEADER + b'r1,2026-11-10,5,"never closed,web\nr2,2026-11-10,5,Fine,web\n'
@@ -517,6 +524,169 @@ class TestFileErrors:
 
         with pytest.raises(IngestError, match="line 2"):
             read_reviews(write(tmp_path, content))
+
+
+class TestStage3Backlog:
+    def test_max_file_bytes_value(self) -> None:
+        assert MAX_FILE_BYTES == 20 * 1024 * 1024
+
+    def test_file_over_the_cap_is_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(ingest, "MAX_FILE_BYTES", 100)
+        content = HEADER + b"r1,2026-11-10,5," + b"a" * 100 + b",web\n"
+
+        with pytest.raises(IngestError, match="larger than"):
+            read_reviews(write(tmp_path, content))
+
+    def test_file_exactly_at_the_cap_is_accepted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        content = HEADER + b"r1,2026-11-10,5,Fine,web\n"
+        monkeypatch.setattr(ingest, "MAX_FILE_BYTES", len(content))
+
+        assert len(read_reviews(write(tmp_path, content)).reviews) == 1
+
+    def test_cap_message_is_derived_from_the_constant(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(ingest, "MAX_FILE_BYTES", 5 * 1024 * 1024)
+        content = b"x" * (5 * 1024 * 1024 + 1)
+
+        with pytest.raises(IngestError, match="The file is larger than 5 MB."):
+            read_reviews(write(tmp_path, content))
+
+    def test_missing_file_keeps_cannot_read_message(self, tmp_path: Path) -> None:
+        with pytest.raises(IngestError, match="Cannot read the file"):
+            read_reviews(tmp_path / "nope.csv")
+
+    def test_unreadable_file_is_an_ingest_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = write(tmp_path, HEADER)
+
+        def deny(self: Path, *args: object, **kwargs: object) -> None:
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "open", deny)
+
+        with pytest.raises(IngestError, match="Cannot read the file: Permission denied"):
+            read_reviews(path)
+
+    def test_bom_is_stripped_with_plain_utf8(self, tmp_path: Path) -> None:
+        content = b"\xef\xbb\xbf" + HEADER + b"r1,2026-11-10,5,Great,web\n"
+
+        result = read_reviews(write(tmp_path, content), encoding="utf-8")
+
+        assert len(result.reviews) == 1
+        assert result.errors == ()
+
+    def test_only_one_leading_bom_is_stripped(self, tmp_path: Path) -> None:
+        content = b"\xef\xbb\xbf\xef\xbb\xbfreview_date,text\n2026-11-10,Great\n"
+
+        with pytest.raises(IngestError, match="Missing required column"):
+            read_reviews(write(tmp_path, content), encoding="utf-8")
+
+    def test_bom_is_stripped_for_utf16(self, tmp_path: Path) -> None:
+        # Python's utf-16 codec consumes the BOM itself; utf-16-le leaves it as U+FEFF.
+        text = "\ufeff" + HEADER.decode() + "r1,2026-11-10,5,Great,web\n"
+
+        result = read_reviews(write(tmp_path, text.encode("utf-16-le")), encoding="utf-16-le")
+
+        assert len(result.reviews) == 1
+
+    def test_unicode_line_separator_in_text_does_not_shift_resume_check(
+        self, tmp_path: Path
+    ) -> None:
+        content = (
+            HEADER.decode()
+            + "r1,2026-11-10,5,line\u2028break,web\n"  # line 2
+            + 'r2,2026-11-10,"x"y"\n'  # line 3: malformed, odd number of quotes
+            + "r3,2026-11-10,5,Fine,web\n"
+        ).encode()
+
+        with pytest.raises(IngestError, match="line 3"):
+            read_reviews(write(tmp_path, content))
+
+    def test_unicode_separators_do_not_shift_line_numbers(self, tmp_path: Path) -> None:
+        content = (
+            HEADER.decode()
+            + "r1,2026-11-10,5,a\x0bb\x0cc\x85d\u2029e,web\n"  # line 2
+            + "r2,2026-11-10,5,Fine,web\n"  # line 3
+            + 'r3,2026-11-10,"abc"x,web\n'  # line 4: even quotes, recoverable
+            + "r4,bad,5,Fine,web\n"  # line 5
+        ).encode()
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert reasons(result) == [
+            (4, RowErrorReason.MALFORMED_ROW),
+            (5, RowErrorReason.INVALID_DATE),
+        ]
+
+    def test_delimiter_is_sniffed_from_the_csv_header_line(self, tmp_path: Path) -> None:
+        # U+2028 is not a csv line break: the header line is the whole first line, in which
+        # commas outnumber semicolons, so it is not read as a semicolon file.
+        content = "review_date;text;x\u2028,,,,,,,\n2026-11-10;Fine;y\n".encode()
+
+        with pytest.raises(IngestError, match="Missing required column"):
+            read_reviews(write(tmp_path, content))
+
+    def test_trailing_delimiter_on_rows_is_tolerated(self, tmp_path: Path) -> None:
+        content = b"review_date;text\n2026-11-10;Fine;\n2026-11-11;Good;;  \n"
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert [r.text for r in result.reviews] == ["Fine", "Good"]
+        assert result.errors == ()
+
+    def test_extra_non_blank_cell_is_still_wrong_field_count(self, tmp_path: Path) -> None:
+        content = b"review_date;text\n2026-11-10;Fine;;x\n2026-11-10;Fine;y\n"
+
+        assert reasons(read_reviews(write(tmp_path, content))) == [
+            (2, RowErrorReason.WRONG_FIELD_COUNT),
+            (3, RowErrorReason.WRONG_FIELD_COUNT),
+        ]
+
+    def test_short_rows_are_unchanged(self, tmp_path: Path) -> None:
+        content = b"review_date;text\n2026-11-10\n2026-11-11;Fine\n"
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert reasons(result) == [(2, RowErrorReason.WRONG_FIELD_COUNT)]
+        assert len(result.reviews) == 1
+
+    def test_review_id_too_long(self, tmp_path: Path) -> None:
+        ok = "i" * MAX_EXTERNAL_ID_LENGTH
+        bad = "i" * (MAX_EXTERNAL_ID_LENGTH + 1)
+        content = HEADER + f"{ok},2026-11-10,5,A,web\n{bad},2026-11-10,5,B,web\n".encode()
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert [r.text for r in result.reviews] == ["A"]
+        assert reasons(result) == [(3, RowErrorReason.REVIEW_ID_TOO_LONG)]
+
+    def test_source_too_long(self, tmp_path: Path) -> None:
+        ok = "s" * MAX_SOURCE_LENGTH
+        bad = "s" * (MAX_SOURCE_LENGTH + 1)
+        content = HEADER + f"r1,2026-11-10,5,A,{ok}\nr2,2026-11-10,5,B,{bad}\n".encode()
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert [r.text for r in result.reviews] == ["A"]
+        assert reasons(result) == [(3, RowErrorReason.SOURCE_TOO_LONG)]
+
+    def test_new_reasons_have_stable_values(self) -> None:
+        assert RowErrorReason.REVIEW_ID_TOO_LONG == "review_id_too_long"
+        assert RowErrorReason.SOURCE_TOO_LONG == "source_too_long"
+
+    def test_length_reasons_are_ordered_after_field_checks(self, tmp_path: Path) -> None:
+        bad_id = "i" * (MAX_EXTERNAL_ID_LENGTH + 1)
+        content = HEADER + f"{bad_id},2026-11-10,5,A,web\nr2,bad,5,B,web\n".encode()
+
+        counts = read_reviews(write(tmp_path, content)).skipped_by_reason()
+
+        assert list(counts) == [RowErrorReason.INVALID_DATE, RowErrorReason.REVIEW_ID_TOO_LONG]
 
 
 class TestPrivacy:
@@ -611,3 +781,79 @@ class TestCommittedSample:
         assert len(result.reviews) == 300
         assert result.errors == ()
         assert result.rows_read == 300
+
+
+class TestReadFailures:
+    def test_unreadable_regular_file_is_not_reported_as_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = write(tmp_path, HEADER)
+
+        def deny(self: Path, *args: object, **kwargs: object) -> None:
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "open", deny)
+        monkeypatch.setattr(Path, "is_file", lambda self: False)
+        monkeypatch.setattr(Path, "exists", lambda self: False)
+
+        with pytest.raises(IngestError, match="Permission denied") as excinfo:
+            read_reviews(path)
+        assert "No such file" not in str(excinfo.value)
+
+    def test_missing_file_message(self, tmp_path: Path) -> None:
+        with pytest.raises(IngestError, match="Cannot read the file: No such file or directory."):
+            read_reviews(tmp_path / "nope.csv")
+
+    def test_directory_is_not_a_file(self, tmp_path: Path) -> None:
+        with pytest.raises(IngestError, match=f"Not a file: {tmp_path.name}"):
+            read_reviews(tmp_path)
+
+    def test_permission_error_on_a_directory_is_not_a_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def deny(self: Path, *args: object, **kwargs: object) -> None:
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "open", deny)
+
+        with pytest.raises(IngestError, match="Not a file"):
+            read_reviews(tmp_path)
+
+
+class TestContentDuplicates:
+    def test_idless_duplicate_is_skipped(self, tmp_path: Path) -> None:
+        content = (
+            b"review_date,text,source\n"
+            b"2026-11-10,Great,web\n"
+            b"2026-11-10,  GREAT ,web\n"
+            b"2026-11-10,Great,app\n"
+        )
+
+        result = read_reviews(write(tmp_path, content))
+
+        assert len(result.reviews) == 2
+        assert reasons(result) == [(3, RowErrorReason.DUPLICATE_REVIEW)]
+        assert result.rows_read == 3
+
+    def test_different_date_is_not_a_duplicate(self, tmp_path: Path) -> None:
+        content = b"review_date,text\n2026-11-10,Great\n2026-11-11,Great\n"
+
+        assert len(read_reviews(write(tmp_path, content)).reviews) == 2
+
+    def test_id_duplicates_keep_their_own_reason(self, tmp_path: Path) -> None:
+        content = HEADER + b"r1,2026-11-10,5,A,web\nr1,2026-11-10,5,A,web\n"
+
+        assert reasons(read_reviews(write(tmp_path, content))) == [
+            (3, RowErrorReason.DUPLICATE_REVIEW_ID)
+        ]
+
+    def test_same_content_with_and_without_id_are_both_kept(self, tmp_path: Path) -> None:
+        content = HEADER + b"r1,2026-11-10,5,A,web\n,2026-11-10,5,A,web\n"
+
+        assert len(read_reviews(write(tmp_path, content)).reviews) == 2
+
+    def test_reason_is_listed_right_after_duplicate_review_id(self) -> None:
+        reasons_list = list(RowErrorReason)
+        after = reasons_list.index(RowErrorReason.DUPLICATE_REVIEW_ID) + 1
+        assert reasons_list[after] is RowErrorReason.DUPLICATE_REVIEW
+        assert RowErrorReason.DUPLICATE_REVIEW == "duplicate_review"

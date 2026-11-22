@@ -1,15 +1,23 @@
+import contextlib
+import os
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from review_radar.cli import app
+from review_radar.storage import connect, count_reviews
 
 runner = CliRunner()
 
 HEADER = b"review_id,review_date,rating,text,source\n"
 FAKE_TEXT = "ZEBRA-QUOKKA-9917 distinctive fake review"
 SAMPLE_CSV = Path(__file__).resolve().parent.parent / "data" / "sample" / "reviews.csv"
+
+
+def stored_count() -> int:
+    with contextlib.closing(connect(Path(os.environ["DATABASE_PATH"]))) as conn:
+        return count_reviews(conn)
 
 
 def write(tmp_path: Path, content: bytes) -> Path:
@@ -25,7 +33,7 @@ def test_dry_run_prints_summary(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "Rows read: 2" in result.output
-    assert "Imported: 2" in result.output
+    assert "Valid: 2" in result.output
     assert "Skipped: 0" in result.output
 
 
@@ -42,7 +50,7 @@ def test_skipped_rows_listed_per_reason_with_lines(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "Rows read: 4" in result.output
-    assert "Imported: 1" in result.output
+    assert "Valid: 1" in result.output
     assert "Skipped: 3" in result.output
     assert "invalid_date: 2 (lines 3, 5)" in result.output
     assert "missing_text: 1 (line 4)" in result.output
@@ -64,15 +72,6 @@ def test_output_never_contains_review_text(tmp_path: Path) -> None:
     assert FAKE_TEXT not in result.output
 
 
-def test_without_dry_run_exits_2_and_does_not_read(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["ingest", str(tmp_path / "does-not-matter.csv")])
-
-    assert result.exit_code == 2
-    assert (
-        "Saving to the database is not implemented yet (stage 3); use --dry-run." in result.output
-    )
-
-
 def test_delimiter_and_encoding_options(tmp_path: Path) -> None:
     content = b"review_date;text\n2026-11-10;" + "Отличный товар".encode("cp1251") + b"\n"
 
@@ -90,7 +89,7 @@ def test_delimiter_and_encoding_options(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "Imported: 1" in result.output
+    assert "Valid: 1" in result.output
 
 
 def test_wrong_encoding_is_one_line_error(tmp_path: Path) -> None:
@@ -148,7 +147,7 @@ def test_all_rows_skipped_prints_summary_then_exits_1(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Rows read: 2" in result.output
-    assert "Imported: 0" in result.output
+    assert "Valid: 0" in result.output
     assert "invalid_date: 2 (lines 2, 3)" in result.output
 
 
@@ -189,5 +188,166 @@ def test_committed_sample_dry_run() -> None:
 
     assert result.exit_code == 0
     assert "Rows read: 300" in result.output
-    assert "Imported: 300" in result.output
+    assert "Valid: 300" in result.output
     assert "Skipped: 0" in result.output
+
+
+def test_dry_run_prints_notice_and_no_storage_lines(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path), "--dry-run"])
+
+    assert "Dry run: nothing saved." in result.output
+    assert "New:" not in result.output
+    assert "Already stored:" not in result.output
+    assert "Imported:" not in result.output
+
+
+def test_dry_run_does_not_create_the_database(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert not Path(os.environ["DATABASE_PATH"]).exists()
+
+
+def test_default_run_saves_to_database(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\nr2,2026-11-10,4,Good,app\n")
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 0
+    assert "Rows read: 2" in result.output
+    assert "Valid: 2" in result.output
+    assert "New: 2" in result.output
+    assert "Already stored: 0" in result.output
+    assert "Dry run" not in result.output
+    assert stored_count() == 2
+
+
+def test_reimporting_the_same_file_adds_nothing(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\nr2,2026-11-10,4,Good,app\n")
+    runner.invoke(app, ["ingest", str(path)])
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 0
+    assert "New: 0" in result.output
+    assert "Already stored: 2" in result.output
+    assert stored_count() == 2
+
+
+def test_reimporting_idless_file_adds_no_duplicates(tmp_path: Path) -> None:
+    path = write(tmp_path, b"review_date,text\n2026-11-10,Great\n2026-11-10,Good\n")
+    runner.invoke(app, ["ingest", str(path)])
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 0
+    assert "New: 0" in result.output
+    assert "Already stored: 2" in result.output
+    assert stored_count() == 2
+
+
+def test_committed_sample_is_idempotent() -> None:
+    first = runner.invoke(app, ["ingest", str(SAMPLE_CSV)])
+    second = runner.invoke(app, ["ingest", str(SAMPLE_CSV)])
+
+    assert first.exit_code == 0
+    assert "New: 300" in first.output
+    assert second.exit_code == 0
+    assert "New: 0" in second.output
+    assert "Already stored: 300" in second.output
+    assert stored_count() == 300
+
+
+def test_corrupt_database_is_a_clean_error(tmp_path: Path) -> None:
+    Path(os.environ["DATABASE_PATH"]).write_bytes(os.urandom(2048))
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 1
+    assert "Error: " in result.output
+    assert "Traceback" not in result.output
+
+
+def test_zero_valid_rows_does_not_open_the_database(tmp_path: Path) -> None:
+    path = write(tmp_path, HEADER + b"r1,bad,5,Fine,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 1
+    assert "Valid: 0" in result.output
+    assert "New:" not in result.output
+    assert not Path(os.environ["DATABASE_PATH"]).exists()
+
+
+def test_file_error_does_not_create_the_database(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ingest", str(tmp_path / "nope.csv")])
+
+    assert result.exit_code == 1
+    assert not Path(os.environ["DATABASE_PATH"]).exists()
+
+
+def test_saving_output_never_contains_review_text(tmp_path: Path) -> None:
+    content = HEADER + f"r1,2026-11-10,5,{FAKE_TEXT},web\n".encode()
+
+    result = runner.invoke(app, ["ingest", str(write(tmp_path, content))])
+
+    assert result.exit_code == 0
+    assert FAKE_TEXT not in result.output
+
+
+def test_invalid_database_path_setting_is_a_clean_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+    monkeypatch.setenv("DATABASE_PATH", str(blocker / "sub" / "radar.db"))
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 1
+    assert "Error: " in result.output
+    assert "Traceback" not in result.output
+
+
+def test_invalid_setting_is_a_clean_error_naming_only_the_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("REVIEW_RADAR_MODE", "bogus-SECRETVALUE")
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path)])
+
+    assert result.exit_code == 1
+    assert "Error: Invalid setting(s): REVIEW_RADAR_MODE." in result.output
+    assert "SECRETVALUE" not in result.output
+    assert "Traceback" not in result.output
+    assert "Rows read" not in result.output
+    assert not Path(os.environ["DATABASE_PATH"]).exists()
+
+
+def test_dry_run_does_not_load_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REVIEW_RADAR_MODE", "bogus")
+    path = write(tmp_path, HEADER + b"r1,2026-11-10,5,Great,web\n")
+
+    result = runner.invoke(app, ["ingest", str(path), "--dry-run"])
+
+    assert result.exit_code == 0
+
+
+def test_identical_idless_rows_in_one_file_count_once(tmp_path: Path) -> None:
+    content = b"review_date,text\n2026-11-10,Great\n2026-11-10,  GREAT \n"
+
+    result = runner.invoke(app, ["ingest", str(write(tmp_path, content))])
+
+    assert result.exit_code == 0
+    assert "Valid: 1" in result.output
+    assert "Skipped: 1" in result.output
+    assert "duplicate_review: 1 (line 3)" in result.output
+    assert "New: 1" in result.output
+    assert "Already stored: 0" in result.output
