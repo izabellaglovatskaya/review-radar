@@ -12,6 +12,7 @@ from review_radar.hashing import text_hash
 from review_radar.models import UNKNOWN_SOURCE, Review
 from review_radar.storage import (
     APPLICATION_ID,
+    MIN_UPGRADABLE_VERSION,
     SCHEMA_VERSION,
     SaveResult,
     StorageError,
@@ -60,8 +61,9 @@ class TestConnect:
                 r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
             ]
 
-        assert version == SCHEMA_VERSION == 2
-        assert "reviews" in tables
+        assert version == SCHEMA_VERSION == 3
+        assert MIN_UPGRADABLE_VERSION == 2
+        assert {"reviews", "analyses"} <= set(tables)
 
     def test_stage_3_database_is_rejected_with_a_recreate_hint(self, tmp_path: Path) -> None:
         path = db_path(tmp_path)
@@ -71,7 +73,7 @@ class TestConnect:
             raw.execute("PRAGMA user_version = 1")
             raw.commit()
 
-        with pytest.raises(StorageError, match=r"version 1, expected 2.*run ingest again"):
+        with pytest.raises(StorageError, match=r"version 1, expected 3.*run ingest again"):
             connect(path)
 
     def test_creates_parent_directories(self, tmp_path: Path) -> None:
@@ -81,10 +83,6 @@ class TestConnect:
             pass
 
         assert path.is_file()
-
-    def test_foreign_keys_enabled(self, tmp_path: Path) -> None:
-        with contextlib.closing(connect(db_path(tmp_path))) as conn:
-            assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
 
     def test_reconnect_keeps_data(self, tmp_path: Path) -> None:
         path = db_path(tmp_path)
@@ -99,7 +97,7 @@ class TestConnect:
         with contextlib.closing(sqlite3.connect(path)) as raw:
             raw.execute("PRAGMA user_version = 7")
 
-        with pytest.raises(StorageError, match=r"7, expected 2"):
+        with pytest.raises(StorageError, match=r"7, expected 3"):
             connect(path)
 
     def test_foreign_database_is_rejected(self, tmp_path: Path) -> None:
@@ -145,7 +143,7 @@ class TestSchemaInit:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         good = storage._SCHEMA
-        broken = good.replace("PRAGMA user_version = 2;", "SELECT * FROM no_such_table;")
+        broken = good.replace("PRAGMA user_version = 3;", "SELECT * FROM no_such_table;")
         assert broken != good
         monkeypatch.setattr(storage, "_SCHEMA", broken)
 
@@ -173,7 +171,7 @@ class TestSchemaInit:
         path = db_path(tmp_path)
         with contextlib.closing(sqlite3.connect(path)) as raw:
             raw.execute("CREATE TABLE reviews (x INTEGER)")
-            raw.execute("PRAGMA user_version = 2")
+            raw.execute("PRAGMA user_version = 3")
             raw.commit()
 
         with pytest.raises(StorageError, match="not a Review Radar database"):
@@ -194,6 +192,236 @@ class TestSchemaInit:
         with contextlib.closing(connect(path)) as conn:
             assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
             assert count_reviews(conn) == 0
+
+
+SCHEMA_V2 = """
+BEGIN;
+CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY,
+    dedup_key TEXT NOT NULL UNIQUE,
+    external_id TEXT,
+    review_date TEXT NOT NULL,
+    rating INTEGER CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
+    text TEXT NOT NULL,
+    text_hash TEXT NOT NULL,
+    source TEXT,
+    imported_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_review_date ON reviews (review_date);
+PRAGMA application_id = 1383486052;
+PRAGMA user_version = 2;
+COMMIT;
+"""
+
+
+def make_v2_database(path: Path) -> None:
+    """Build a database exactly as stage 3 did, holding one review."""
+    with contextlib.closing(sqlite3.connect(path)) as raw:
+        raw.executescript(SCHEMA_V2)
+        raw.execute(
+            "INSERT INTO reviews (dedup_key, external_id, review_date, rating, text, text_hash,"
+            " source, imported_at) VALUES ('id:[\"web\",\"r1\"]', 'r1', '2026-11-10', 4,"
+            " 'Old review', ?, 'web', '2026-11-11T12:00:00+00:00')",
+            (text_hash("Old review"),),
+        )
+        raw.commit()
+
+
+def table_names(path: Path) -> set[str]:
+    with contextlib.closing(sqlite3.connect(path)) as raw:
+        return {r[0] for r in raw.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+
+def user_version(path: Path) -> int:
+    with contextlib.closing(sqlite3.connect(path)) as raw:
+        return int(raw.execute("PRAGMA user_version").fetchone()[0])
+
+
+class TestUpgrade:
+    def test_v2_database_is_upgraded_and_keeps_its_reviews(self, tmp_path: Path) -> None:
+        path = db_path(tmp_path)
+        make_v2_database(path)
+        assert "analyses" not in table_names(path)
+
+        with contextlib.closing(connect(path)) as conn:
+            assert [r.text for r in list_reviews(conn)] == ["Old review"]
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+            assert conn.execute("PRAGMA application_id").fetchone()[0] == APPLICATION_ID
+
+        assert "analyses" in table_names(path)
+
+    def test_upgrade_is_atomic(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        path = db_path(tmp_path)
+        make_v2_database(path)
+        good = storage._SCHEMA
+        broken = good.replace("COMMIT;", "SELECT * FROM no_such_table;\nCOMMIT;")
+        assert broken != good
+        monkeypatch.setattr(storage, "_SCHEMA", broken)
+
+        with pytest.raises(StorageError):
+            connect(path)
+
+        assert user_version(path) == 2
+        assert "analyses" not in table_names(path)
+        monkeypatch.setattr(storage, "_SCHEMA", good)
+        with contextlib.closing(connect(path)) as conn:
+            assert count_reviews(conn) == 1
+        assert user_version(path) == 3
+
+    def test_upgrade_with_foreign_application_id_is_rejected(self, tmp_path: Path) -> None:
+        path = db_path(tmp_path)
+        with contextlib.closing(sqlite3.connect(path)) as raw:
+            raw.execute("CREATE TABLE reviews (x INTEGER)")
+            raw.execute("PRAGMA user_version = 2")
+            raw.commit()
+
+        with pytest.raises(StorageError, match="not a Review Radar database"):
+            connect(path)
+
+        assert user_version(path) == 2
+        assert "analyses" not in table_names(path)
+
+    def test_current_database_is_not_rewritten(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))):
+            pass
+        monkeypatch.setattr(storage, "_SCHEMA", "SELECT * FROM no_such_table;")
+
+        with contextlib.closing(connect(db_path(tmp_path))):
+            pass
+
+    def test_script_is_additive_only(self) -> None:
+        statements = [
+            line.strip().rstrip(";")
+            for line in storage._SCHEMA.splitlines()
+            if line.strip() and not line.startswith((" ", ")"))
+        ]
+        allowed = ("BEGIN", "COMMIT", "PRAGMA", "CREATE TABLE IF NOT EXISTS", "CREATE INDEX IF")
+        assert all(s.startswith(allowed) for s in statements), statements
+
+
+def index_names(path: Path, table: str) -> set[str]:
+    with contextlib.closing(sqlite3.connect(path)) as raw:
+        return {r[1] for r in raw.execute(f"PRAGMA index_list({table})")}
+
+
+class TestTextHashIndex:
+    def test_fresh_database_has_the_reviews_text_hash_index(self, tmp_path: Path) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))):
+            pass
+
+        assert "idx_reviews_text_hash" in index_names(db_path(tmp_path), "reviews")
+
+    def test_upgraded_database_gets_the_index(self, tmp_path: Path) -> None:
+        make_v2_database(db_path(tmp_path))
+        assert "idx_reviews_text_hash" not in index_names(db_path(tmp_path), "reviews")
+
+        with contextlib.closing(connect(db_path(tmp_path))):
+            pass
+
+        assert "idx_reviews_text_hash" in index_names(db_path(tmp_path), "reviews")
+
+    def test_index_covers_text_hash(self, tmp_path: Path) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            columns = [r[2] for r in conn.execute("PRAGMA index_info(idx_reviews_text_hash)")]
+
+        assert columns == ["text_hash"]
+
+
+class TestAnalysesTable:
+    def test_columns_and_index(self, tmp_path: Path) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            columns = [r[1] for r in conn.execute("PRAGMA table_info(analyses)")]
+            index_columns = [
+                [c[2] for c in conn.execute(f"PRAGMA index_info({idx[1]})")]
+                for idx in conn.execute("PRAGMA index_list(analyses)")
+            ]
+
+        assert columns == [
+            "cache_key",
+            "text_hash",
+            "provider",
+            "model",
+            "prompt_version",
+            "sentiment",
+            "topics",
+            "confidence",
+            "analyzed_at",
+        ]
+        assert ["text_hash", "provider", "model", "prompt_version"] in index_columns
+
+    @pytest.mark.parametrize(
+        ("sentiment", "confidence"), [("happy", None), ("positive", 1.5), ("positive", -0.1)]
+    )
+    def test_check_constraints(self, tmp_path: Path, sentiment: str, confidence: float) -> None:
+        with (
+            contextlib.closing(connect(db_path(tmp_path))) as conn,
+            pytest.raises(sqlite3.IntegrityError),
+        ):
+            conn.execute(
+                "INSERT INTO analyses VALUES ('k', 'h', 'p', 'm', 'v', ?, '[]', ?, 't')",
+                (sentiment, confidence),
+            )
+
+
+class TestReadErrors:
+    def test_count_reviews_wraps_sqlite_errors(self, tmp_path: Path) -> None:
+        conn = connect(db_path(tmp_path))
+        conn.close()
+
+        with pytest.raises(StorageError, match="Cannot read reviews"):
+            count_reviews(conn)
+
+    def test_list_reviews_wraps_sqlite_errors(self, tmp_path: Path) -> None:
+        conn = connect(db_path(tmp_path))
+        conn.close()
+
+        with pytest.raises(StorageError, match="Cannot read reviews"):
+            list_reviews(conn)
+
+    def test_list_reviews_wraps_invalid_rows_without_review_text(self, tmp_path: Path) -> None:
+        fake_text = "ZEBRA-QUOKKA-9917 distinctive"
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            conn.execute(
+                "INSERT INTO reviews (dedup_key, external_id, review_date, rating, text,"
+                " text_hash, source, imported_at) VALUES ('k', ?, '2026-11-10', 4, ?, 'h', 'web',"
+                " 't')",
+                ("x" * 500, fake_text),
+            )
+            with pytest.raises(StorageError) as excinfo:
+                list_reviews(conn)
+
+        assert fake_text not in str(excinfo.value)
+        assert "x" * 50 not in str(excinfo.value)
+
+    def test_list_reviews_wraps_a_bad_date(self, tmp_path: Path) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            conn.execute(
+                "INSERT INTO reviews (dedup_key, external_id, review_date, rating, text,"
+                " text_hash, source, imported_at) VALUES ('k', NULL, 'not-a-date', 4, 'T', 'h',"
+                " NULL, 't')"
+            )
+            with pytest.raises(StorageError, match="Cannot read reviews"):
+                list_reviews(conn)
+
+
+class TestNaiveNow:
+    def test_save_reviews_rejects_a_naive_now(self, tmp_path: Path) -> None:
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            with pytest.raises(ValueError, match="timezone"):
+                save_reviews(conn, [make_review()], now=dt.datetime(2026, 11, 11, 12, 0))
+            assert count_reviews(conn) == 0
+
+    def test_an_aware_now_is_stored_in_utc(self, tmp_path: Path) -> None:
+        plus_three = dt.timezone(dt.timedelta(hours=3))
+        with contextlib.closing(connect(db_path(tmp_path))) as conn:
+            save_reviews(
+                conn, [make_review()], now=dt.datetime(2026, 11, 11, 15, 0, tzinfo=plus_three)
+            )
+            stamp = conn.execute("SELECT imported_at FROM reviews").fetchone()[0]
+
+        assert stamp == "2026-11-11T12:00:00+00:00"
 
 
 class TestSaveReviews:

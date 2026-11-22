@@ -1,0 +1,1468 @@
+{
+  "analyses": {
+    "012631ed0daf83772f6f660c751f29dffdc9830ead9008bdd54c09cf45fca713": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "020391552674dc0286a9f5e2d5a1904cb8267d9ab403f3855d155ea90c4aabdb": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "02fe69c51634a47fc43d4d7875af2ad581141964e7179cf4be58106cf8b8e602": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "084f9a4a873b691d29ec0d16486463e02b761b1a85dd6ab0dc69d856de529ea0": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0878d15183532e66724747e14cd61f04d06cfbf1d513510eddcb37d7bfc6e06e": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "08978b22456628ab330c81796e3e371defe97c6c16f6aae22f70acce87846412": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "08a0d4da68ed5d7469894518404633aa8084452700dbe49c97ff25759b3305f6": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "0a9a0af1d25e78d66e4860ce9c70b2e9ccf3647a376490810617c3a47b8dec6e": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0b031ef3154c591eca20c95bb12c4cbb8327acc867f9f0c6c440394735ba495e": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "0b3ecf51b4668e4abf806abdeacc6a0d9b09700a41bdaae1c99dd8d22755a4e3": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0cbe4474499c3d73056c52f55cdb5c25a3ed2c79c8bac2ba72d7760b56b0b860": {
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "0d95af4c8d2271dd3e3caa3545caaa54dc1af2288294cc5b37899300ff8ee81a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0e21c30644b2830d0855e470d5b9d0f40ac39b2b80298e64b61b1073eb173fba": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0e4f2f2f3d83d264b500b0e569d18f495b1c6813ec3444b5a95ecf6a7af19b92": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "0e6b97fd27d7fcbc04d0f016dd017add74de54216c0c998a0993c69b0b34d8fe": {
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "0fe3dcda404cabd7f944ac9de074342711291da7dd61f04cfc0068c8bf221a43": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality",
+        "refund_process"
+      ]
+    },
+    "10a39d49578f794ee5b8fc70fbdd0f525f2424d8b9fae4a8d3b2b243cbea0f04": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "11a10eefcd33221dfddc6ea64f76510c32b486bf94fc94161aa4859661867a46": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "12005bdb53ff23c9668aaab94534a7ca19b568a9517963db12e0ce7f9c02e3f3": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "12137de536e4020d043024373fb0ee1725193d48bb64cb93e1defe743a9f6b1f": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "packaging"
+      ]
+    },
+    "124564d4f8d96e05e7848814ea9c72079122270e1983c7bee44d1b0a7c83791e": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "125278ef5416f96ca24615735a3fdbd0b30fd7eb42ccacf172f07b019600c216": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "12b6f41647f32e74d250fa705460f485b3f2ba1491eed14d9433a76c461e051a": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "13de1bf0f2dedbf2d9e3112076c855a4a263f873e220553c82b6e4f667c25afe": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "14daf5327e24f1188f8c8f465ccec8509a27c7ba15bb5a22449ad8f532c5dd38": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process",
+        "customer_support"
+      ]
+    },
+    "14ec5c28ada3c6b11e98fc70be772e4b6e26708f00f597056fe55245e5326259": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "1a2130e97f620dc4af75ad22cc3880b84e2f240deaa9c3f848ac0d6ba81ee48e": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "1b1b203632779c325efda158f2f0fa071e30fbc54a165802b4f6878fd2b98d5a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "1ca74a735071aee0de7c00d4755f727f8cd8a532f8f00cae60480f17df7b465c": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "1cac281cdd2d5b6da53e72fcc024e190bcf658ba3d22cd454c7f2662b5769a65": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "1d62421db4f6193fc5aa3fbeaefbcb0002f204669be613e960fe3f6ec7206122": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "21a96e41458f4c4109dd76b7095b6f697c4c2bee5c7814279e81c42f84505898": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "234eb8110786395337e124b9375c129230c90dd6f8c6e906c756405f2ca0ce04": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "238de131613aabe6ea1e987b04e70991980af3eeb9da0f553df2e712a5833f6f": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "23ee8cfc94bbac24ca90da9bf821706961594a342b22a42ea571927b74fa021f": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2442423846dda057085a540f72175399980d03294f0677a49efa45201c07e342": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "256c208e8e67f6362ad23911a2dfc81e4c5debdd9229096d1098a44f9a122a20": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2581af8896634a3cbe47e1b6d3a6e02cd42e295ff873a9bdc65e754df002ef57": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "2582fcaaa7e38fd7c851a6f5655dd74373d8e99513a0a78ba2e4b7f3baad2cf8": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "25a23d2b0466551015042e0cdd93eb515e0c8a20924935814053ad91fd3ab923": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process",
+        "customer_support"
+      ]
+    },
+    "2663020c6f8a7012e4727f29592518b56ca219503559e95d45b6047be65537e1": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "276be84e240f5f879121bf55e9af4fe59a46804942c4ae4159b6867813a63d52": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "284341adfdac2a305fb6884d754c905c6f4f7b61e742e36fb57b49e8ccb43830": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2939be74ca41714f4451221dd9115d7abcac534af8e1cdaff172ef4d3d72f9e9": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "2a20ff25d396a82cb5741374aaf47cb16e5753cc155c99b27803b967343661e8": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2a65390d3eca7e5b1cd0ac47b03df27933afddf7914216ff1f85b26dc2fe5a23": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "2b6146de99101bccb1cde2a69f3a99dc7cb2d3674aa40496698b67310eef308b": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2b98ea7e4310b4b98ac060179fd6329c24909c8178554214371549ad44dfa0dd": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "2c69f0da65a103685b78e211ce2cd8d5b3c8b7f17d8bf45c5ecc558b6c5a7551": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "2dbf98f7f1a60c68e18e62c698c3b0e38b7f6d97ed09c93e426f3c08c4b49f7a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2e38ad63afba403f2a1d68500fdbc62d630d8527bd0311267dc805a21e8c0025": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "2fc0588c27eedb13d35d24aceed92d3f445878136b0f17af8caba94dd628bf5a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "3059155204a973faa9900c9754548ff91b9e8bf2ff23b9a6f732cf91fb766bf8": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "309ea3bdfc5d17094a55c2901fcc3b48cb777f1a0fb3671b746748a427247542": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "30a8692fbf61f3b6879dd4d29eec15cd1999a9c4cf4553472aceabf1175e6e9e": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "317dac27f81c1797037fe9160b152fde0c11b7872838151f3a9caa293f9ec49c": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "332c3f86abeffab5a03f03b293488e168f55247e745c4268d6d86b1d111018af": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "33ea8979c29760a7de9922f1e36141b70ee0c5a0e42bcf6cb6cf83724719c0cb": {
+      "sentiment": "positive",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "3490d8aa025a49148b9ca1d2bebd6caba7b35681acd1a8f3b6801f324adea2de": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "35ae6c8590d37d7675f3eb8f9eda9b7afb3fe5c2fc9f8e7e1f3adb3401fff481": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "39583c8bdd972e9976673fd25ca5d3833d5d8dcfaf8764d685dd9daf34df1bb0": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "3c28168b61ced38512f48332e9ee18e134661a2f9ed66263a21782a503dcbfcb": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "3d94c59299acdf0ff405e716125576f14c4e312f1430e24a221fcb83e37d8dd9": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "3fb96d8b9a84ad19dfe7d7e9b61a5641b68e621c96dc45fa604a10ef162e9846": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "4058927419bacb44a82b59fd806cc38dbb23b8a6a74b2f89a611155edcb60adf": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "40a742a91cc87d36e18cb0b28b1d47d76be24d22e8013d5eb296086ffa93da37": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "40fe29ca3a9c7345e047c8abbc06c23b59ef6049318029dc46c8492454e7d840": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality",
+        "refund_process"
+      ]
+    },
+    "4144a0259c040e73bcf2b69da8c33da8dbba860510093d69a92abc0ec09f0af1": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "420ed382422601825a077459776c722a72bcdd26e91eb49ab26adecddc3e0c82": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "42ba5d5dac7a8c321a784d1a4c993466402716b68bf5326c191312de5d0e0b84": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "433cc64d625692905661f624002d67ce6a3cef699133a18687655b27efe62d07": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "43ca3c6da063cf8a7b6de7870f07111a9a0fc999b883ac3c9c3cc75927966fa6": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "4405402b69c1cb473b71984e51732297877e4e93d6e70131ccf959acb51f547f": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "4592a3dea230a6e156ac023c6b97b4378f59bf6191fa5f805d1e1f841ff4fdd3": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "45eac5309843ea779f904f492a6a193e00c284b76b9e85be39f2e795afc9f37a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "47189cb6db93cf34495709cbb95da34717f68bccf820211e3cfab11314b740f4": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "477d095550661cf2622c67c67de28bf6f8760262ae7a712bd1e433ec47dd4104": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "4798835b3390dc7ad73c9ff40d9386bd69573aee3a102a24329929b1aae0b60d": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "47a01fe8281f61445f56c3137f1afee5c686ff74390219cd75ca57aac5846fc8": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "4857aababd18dafe6d39b0a4c8672d92ea7b1e4280719d0aa0ee289a1f0665bc": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "49d740a394b2f279f0fb82d97066c0f98f6bb84ec0db3ec6ae7fe953606dde96": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "4b42a6ecb8886daeeb895e7794499dcffc1d0cb397ea26943a3fc42af7fad086": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "4cb44d5fe63d8fb51d5b2f57ad70ae9f26c52c76f9ec8e72828b4a4dffac1bb3": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "4cc49761644a618aeaff5e9cf8e36bb037149ecf846567e3325b8528c27bc6b7": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "4d027b4dd94c8758cd8612dbf43425bfcefb7a19f9c92f8372d1f14628af3fa3": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "4d266a710a3359639d3f574998d48fce24fa3bb8cec536b8445a93bc1482cb0b": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "4dc73cd6087294ca7db27636372b22b0f21092c6e7a11f7a592bda41d0a7a862": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "4e48639f833f1947eaf8cca123f2d0715a1ba1553687b274145deb40cd9c9b5f": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "4ffb56185b0e2be7584ea2b18a379a0abc3f2d817baef817f197c916a3eea36c": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "514f60f6f16928d57404f2414e383c1eef5bac5045852c0dc19c1b7e8c26fb6d": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "51fde5ffb1a2ca1251091471215866277e09fbbaed99394d60660d8aeba29370": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "53459285b24250ff7171bd65c39f8e1fabea313efbd00e579379595485f3c1c3": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "53fc56d2403dc87499e9a74a8af73fb46b893339c1a46256012f326df5be1e45": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "54f1497950efb8930275aacf1b3f3f4781687e281029d2a6c4f47db2a27cfa5b": {
+      "sentiment": "negative",
+      "topics": [
+        "billing",
+        "customer_support"
+      ]
+    },
+    "55160c98e910be6397ba2d3adf33cce5d4623acc1fa0224f51ab8b0ae0c8e486": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5533fdca564698d10c4ec8d5d101d0b232efde9bda60de813b06a98419607f3e": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "55bef16c85460f1a71c2e791779359497ac6ef26e7b712664a43426e434c81c3": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "56bf417059985d14f0d83f8954d710520b982a6dcbb2462c896df32b076cc746": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "5756db956d0f6fc191c12d155e54e3ef0346815210f9cbee5803c34b7a190b97": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "57c78819b70ed11ff282b54a8815f54ced0df9e1f00bd29d21a897eb58ec3e0b": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "59e8d9afc5f994fb9dd0c1dcc5dbbd1b87315dc493cb18fe8fc110feb7f1d21f": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "5aaf2228cf37f4cad66e301887f64d7f7c9fb28bacf515bf4fe869248faf1721": {
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "5adb87d4e5fa7e483e7d3c8705d132ada24bcd6c3bbc57dd94585a98f3d2f4de": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5c8871bc322e46cc627d5a91773ef4e7003d38a92d7d8f60aa9a0e3bb05c2113": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5d6874f1565c36ddb84c53c0e865a6a3bc002a05caa70674c303e28aff51eb34": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "5e8664ccb66f3d961720d96379d3b06f4400cc17cc50ce5f968d828d5135f672": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5eb6c09a8992fa8ea7ca9a44dd5bd82bd86279cd1adeaa1f555873404ce15a92": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5fd5455cd175a8b4f301f182dcdeaba1f78de64039187c355ee30428e0d0a55a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "5fd611f98297f505706ae4449d04192c7e8a35e2742fd83bc7de9b0ba9c200da": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "6089475522b261617ef5e1a045ed26d5ee7d4c297f97e76c04fcb14ae1579b0d": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "609be99d98f365fb3a209b3cda2ac4ad7a293d113eaf955c47f7c53682d8bd2d": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "6114a9d8c7b52b519ee2fbfd27030f933ad301a79c931661d2605ababb1086a1": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "61340a5db8864744e1450397611d026303329bc5a0af3f10a62830332e542761": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "614f329b410e0d265bc443ded365f39e6a86eeebfb0d53a0ef20995cd769907e": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality",
+        "refund_process"
+      ]
+    },
+    "61c41b2c017dad31f442ff0ff8288cd0f165a9ab3145f7434b2902ba1ea3ba24": {
+      "sentiment": "negative",
+      "topics": [
+        "other"
+      ]
+    },
+    "63393a79fd18a3a1312633a2cab3455536c7339c43d75377a646dfb0cbef56bb": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "6378e7ba9c4fdc966eee6168f9743c0e7d7ee494e4b73257935369d292d6438e": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "63928da2554be169042da149f173ab248b03c04c281ae83a77a07fba740e8d85": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "65b4b69e34f288ea5078287eac725563d575085588e87c8aeae8ad6b5cfbb06e": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "65e12e59dff9de1e85f5b839c86747bccee9d35b8dd833eba8e3d15d663b8990": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "669375aa88d2d522166c74b559229618c9dc99b43863081f635acb43cb11c9e9": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "67844fba689944220861e06b413ddd595c5ab765d5ec3c5d4eab129b68f22ce5": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "697508814a3e7787b62f829eec3037ea1e30031c5cc1b140f7d381c51c78024b": {
+      "sentiment": "negative",
+      "topics": [
+        "billing",
+        "customer_support"
+      ]
+    },
+    "69987a815222534d38ea25824effe71058fb4be3aba5f06c03a8dce6b107ed7f": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "69bb2d0be5c01ec7d5accf462bcffd8d14ce0e4e9183ba5fabcfcb94296cbdc4": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "69fffbfbae320ff543e9e78813fab5ccd37cbc7bfd6a051d733113e6629c5b29": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "6a281f17a9f0fef5454fd486a19c5f7806dfc0cef79fd66ca48a5630858230c5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "6d59aa8cba9c1a878d96685b5ad716888cc7ca0c5a0f713d30aa2dea8114932e": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "6dccd49c8858510957945576cb77ade217917484d519726f280490368100870a": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "6f53fac7b9f0d9a0e4b9ef19460ce9f56b467840a34287673b121393acbc53f0": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "7292f6efbc96cb9509d950f2679c741cf0a3c5738709259ca8d5c4fdcd32f41c": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "73567634a25a84849b9486cf61fef65717b9497797258de9e59cdacc4d1f2bcd": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "737ba49f77fae87388905225065fea1d8df8c3a55273dc766183eb26804d5971": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "7540dd32aaea9dd5453fdfd5db4fcd4e91cc4abcb6357e8f56aa25e6d88aede5": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "75d0d3d4ff27f1d3b0d3e4196981d64f2821d77854947df0381c30c42065df69": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "7601d3277a4b1aec38d55244a9a3e6ae3611b9159d13cbe4ec57556e0b765d17": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process",
+        "customer_support"
+      ]
+    },
+    "7ac991cf2ca45b4267d42014e7b5398db257dc051c80fe2b64a87f95c3b802b4": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "7b12ccb5bcee328b75a64a0bbc60eef25cf1a513a6cdf330b094020340ee34b5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "7be0c966c09983709a8cae5a73019e3767abc3a71e0ec8d031f9e22bda4ee2bc": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "7bf5c7ac62e17ec5c09cf5caf36d7a33edae35776939fd7040854258c8a7bdda": {
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "7d6ff8ee3db4ba6221c01c562bfbe0ad61935e3922ccacf8317bc9be7a2c86f9": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "7dfdd2553a962f8c6820dd37375d014ffd9caf9faef19b4b69b04f71d5d0c47b": {
+      "sentiment": "negative",
+      "topics": [
+        "other"
+      ]
+    },
+    "7e7398e2817beb185f3144ba78da1d7ab5f6506d68949a059fce8a2488e9b071": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "7f788338d1c2c62479ad40d8477780917d97ffad3c5c95c16a9c796692226d3a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "7fa610bbfa4633d019ae63598ff115bce354410e4ecd012e9cc0a14827f340b5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "804583396fd7b8e9bfb2f48989074f330402c71cc8c579ba3516670eb6311342": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "809fae157b1f0192bde1ce4c0eaa43579db126141a42ad59030401cd53b0af97": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing",
+        "product_quality"
+      ]
+    },
+    "81ea4b51ec8db0df09abb138d1b9eab8fcc1b07746b933ed10bb279eedf382ee": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "8278fec162641fb46818354e7f8499c27e037a503d8d19054f532b7dda4fc0d7": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "829c0795e788184e28c6f39bec2b71147b483c795f0a167f64161a0c0ccc20f2": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "83ee1d7c070b80b72e997e88d92cd34bc4a242947779364ff0b15dc5ba4f9af6": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "856956c7e03b559c794a4302701222b3f7f1c86eb3de350b0280686d80a3e293": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "85d4c636c733dc0a544cf543d942af5fa47fd4162b728dddfb8b0cd2497a2817": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "860ae41ef5a338f893722b9995d6b2358dd56a631105b5dd859bcd8c1ed73cf7": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "869a14f6f11fa2afb47220701b7653dca151f5c437413aca96c93e9b6b108622": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "882473c5d845fc523a04a001fe802e2b1f9b37e8c3ef89b215e9802964eb8117": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "896c7f607c4bd25406519665819af7deac9113d281de0840588fc8df141c86db": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "8a51a98c73dee7ee4e264c37a48d3dd2e7582f02da7cbc6c68a20afdc1d804d7": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "8dd2bf2071fce357f546dfa776b7d13d2c3c97038022fdcdfe2bf501fac5342d": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "8e88368d1c71afa3b17c3a6ad71d8e70d0f8e0206ded69e5591cdf7c7351c846": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "8fb591d8fdb17f8c0cbeddab1a84bdcaf601746dbf881f3a006c88ecbd4a3503": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "9028d9722a4799f18f5f5242a0c8cf057a33bca95e5ffa0b12f79ad092219089": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "packaging"
+      ]
+    },
+    "94c1b6adabdc5e599de9559bcdea08cb2b556f04de43fc4c9b0d70f4f35e2196": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "95e7e8d195062330db29acc6e371ef0b31805218845b76a5ea7ce2b88d213529": {
+      "sentiment": "positive",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "966dd684c227fab492a0dac799686ea87b797c2cccf9e7e587c893c95631d0fd": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "9759b43578c5d10a40fec4ad25a73556938736b8bca91736379b457bc4609df6": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "97dfe41ead2cc41585d9abc2884a4d2e4cb822fd1f3397a588111f6408622fc4": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "9835ddefc93393b437ffcd6fe42cc0fce52898b665e72a6fd09929254ed4e016": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality",
+        "refund_process"
+      ]
+    },
+    "984574969ac6113b0d24203c5340daf690b5e971264b2509bc154f23a23c3640": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "9897649bb80cfd4d381cc0d8990da7e5c52bc16125d1faba2497efb522e9615c": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "98bcb6bf422f66834f5f2f1396415c153a98abca5c7b9a33dd291f1f10910269": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "99025ede623c92c8fdafaf33e3302d4cb75f518d52cc2923b82b98fdee845dc0": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "9ad1f651078d81f9bb6c3868b71785aac1bbefe01194c6cf3a4c36651fef9e38": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "9b8394b218285e853c3a5ab7222b6d4b6aab687cb0d69c1b44a0f806b03c4615": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "a2c52e9b788c4f0dbb1f9d76c83bba2b62c1fc0c13b2ed4433bb8eb26df7e87a": {
+      "sentiment": "positive",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "a31b4bff27eaa2eff2eb4522d536bd4060c03a19f4eb2451f4466f7658d4bdea": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "a5362da8cfbff8b7cef57652802586577a506ed948bcc4b0cfd35397ed3781fd": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "a595dff59001e62f272f4da0da4718b85772c815b2d12aacb2c0c9ee059eb4a3": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "a6e152815ae64bed88c8a6cd100fbedcb9ceaf455ef78344d84bb00d05b42890": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "a7c0e8e3175c52ae83fe6a3bee4bb2b443a6c4d50c9c3d331d59c8793fffc1c7": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "abae9938a4cfd07307813a7f6b11b98db90c573039a4b4e355806ae6a4e5c3e3": {
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "ac2da805f1e7db3df387c070c4e22fc4c9f143f76be3658f3d570858295dc8cb": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing",
+        "product_quality"
+      ]
+    },
+    "aea76633ed6fba2ba53cd69feaedcd9c03ecbf2d4dfe64b7ac36aa999f137a77": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "af2e8e1fc64f2bec9b8dcda88838cbccaa6eb5755f0f7970ea0b51fec7867eb4": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "af7a3a79b6b27295d79bccce862a02e8fbb0592933b7eaa4b5610232c2f7d5bc": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "afadd0afccfd17d24a3d7ca7aae069ff55504c848ae3cbc8478ebd300644582e": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "b009b8470f0dab9408af068fb8f3266cb5d8e059ef4688d6adf3e24f2adb706b": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "b0cb222ed2fa3e47375234e09bcb2d72721627dcb57bd7c8032ebf60f0b02a67": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "b117a15676304bb27e7403da1f878d1bab659b948243e9615cfca5368f51fbdc": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "b25a32ddd11193cdaca08c250bd52c7a578f37967c668c479891519c26df1955": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "b2f835b8fed9fbe33167e3212f904099f6f9abc67147f1ac1bf50ff587326718": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "b314dbb982a905eaf1992b630acbd31add31861d7a6980a54d3d42a06b7618d5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "b373dab09f9ed4ba5ef0c9c0bab1071941a34ab6a957f450e905f4b85919737e": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "b4b3791da24f10b789b368bd1c78a9e0cfc30bdbb4ea80b5c13739890109a412": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality",
+        "refund_process"
+      ]
+    },
+    "b817d30f175280e1b6774fe6b9058c34872f7f52a411ad8eb581ba8359fd47b5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "b87a605f1b6de0729463f8f825c5674a327a3c7a69c5104c3498985d7eb7a7b9": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "b8f8e05be63d7370ed3742bd660d6bd4ab786b4b59b9de6fa7801c7a08fb334a": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "b90e0f960c9b50d9778d140093d20146e8483720b04d67603f523c5883d32cc1": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "b93aee8198992ec75989f76ef5a734a29da37035cabfc257b159d24d8d832754": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "bae1f7707d81aef70d1401bc320005fe40863a99105a94811df0ecfb105a11aa": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "bc7381d3e0dcb3b8f5dd2299222a450d1a887726f05b17539ce4f90c8ddebd78": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "bcf488716e3ef4c45fde779d5157eaaceef7aa584e2db09ba8bfccf15b7bb13a": {
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "be2626f6a650af5873e72a41f3510f2020dd7c9ba87a1776da0b294e485c12a5": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "be32da702af9c7f3d62bd726a965e602d7e68debadbae92353be61fe2701f975": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "bebac650acede8073c6204186c624bf38c243a9991d1315ebe15c578b9f98829": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "bee9af1630bb3288a34b09c48de039a89679cd2285c91ed29e46e7610a2fd902": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "bf05a017bc8217696493a4afc38b1792e1c1ba820461716a2d00f1d18a88a29f": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "bf9004c2fd9736af4f42d54d7e35c74dcc66a437f8bf9256fb773ee1476bbd19": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "c0f45d118642cac36cd46c71b0820fb97c9ffd16252384f43206876680c4da96": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "c34339bcf51f655089d21b5b5a5423662734e3d14827d604c3d78235cba0295a": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "c36acfbb988ee8f1ce9c49d10a5b7eef2857018e4613a119de1604f0b98fdc72": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "c6643b662ced39f2bb2e876c4c945336ac7e051a84e25f4a6a108a93476fe056": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "c734ed92c8717bd1b6a958e4fe70b0be792065bbdba620be61834a1a2d386f69": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "c73a73b53bbc26adeea9b22553e5de6b2c8f983eee8a6f6ff7235b91be5fc2eb": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "c8874b8b44f9f368178023ba990c6b492379dd5dc4a9c1736adc4f639f19d7f1": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "ca998b1788d8bd6b2bddd039427fd23e396ca9f3d8498929012d2d2f3ab8e2d1": {
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "caea3be77e9bb531bef3ca1d614f5476984727cbe7e41f83f32efa993d4ac973": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "cc15363771af5bbef6a26e158031d397b131ca54d0f008876e1c64c5032ee777": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "cc1b626f3fc9136de70e8f03e404865a3cd98e431199f1b9e1f7962eb546e843": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "cd52a8aae5097e1d37ecaebea5b522ed23780a0e0587799e5be1a483fc73c055": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "ce926c17dd9d397e945e08a04ad309866e9fd966289a1dee105bd0acf9553786": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "cf89a3ca60290ce08bd13aac0518c7adaa43b8b1067785b35c1d14a21dbb5ffa": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "cfe8c20a183dfa90f533958d15b0fdf4d8ad9009468a28b18fbb76da25839dfd": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "d1d22e6e1c33c8aa0fb52854c8fbf872e457f9d552b6f366fb300c32adb3c16b": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "d1e1e613ad50d7c994727361398e525b29707aff632acd256a0f83a1064dc783": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "d488e3f0f397fb48bc38e1e870bef7954d79ab0b37aa10d2560931cf9c67ae7d": {
+      "sentiment": "neutral",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "d52db10d2b9ea2cc42de10f319ecfc1cd44d1f8f0165fa8a9fe948fc3a4a5273": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "d8b42617e23a61fd49f50c2f3f3a6ff469dc737c823cd779bf416072f392176c": {
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "d9ab5049950df86e4492da8d10170825add1df6205ffe0df982ac681eec5db47": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "da55b55625824518bb18ab15b67bdf6f1643ecc030a4ee89122bc3b709b49cba": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "dadc12a5cd356452d675cda4ab4b4007f51cd85da9f2234f5b782fe586f0a110": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process",
+        "customer_support"
+      ]
+    },
+    "dcac6e72b80ecf3bfa69cc54adac5ff27718af1fe57b9d0da3a2060c87553300": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "dd9d27f2321a6d76091c7ac8b22a243fd65de9f850b2686dd091248d60616286": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "dfd2444e5c8b717def7a453fb14234662b7b58f96c5360cbe45346551826d0c9": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "packaging"
+      ]
+    },
+    "e008348b02f683e09f5a6b247d0a8e7d1fba4a8212550aa466bf91ba38d74a15": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay",
+        "customer_support"
+      ]
+    },
+    "e0cd88012280bcf40fd3b42719e5f14263aec490d3ff3000dc0349375f92d93c": {
+      "sentiment": "positive",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "e121464eeab333e4917fe9c6a726f88c8eb6e561c6cde3b2003c8e56ab44c4e6": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "e12627fad533d297b8e5c39e4f8f18f78a152d205c29c40486437f3616d679bf": {
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "e1a271a6f85679a6610123568a4819c3a125b96368ecb35c7c10d9eb8def47a8": {
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "e24bde07d8b2f69c31f5c0bc8474f98e0200782646e0eeb5baefcc9e7c1483a5": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "e2e9c7e8f363c2bcaabc97f80c222a021fa490308352b61ef817f9efd8b967e4": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "e493631411d75ce47e8d2276e3e207c92406d8c016fd74ff34c716967d78c140": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "e4c01439ac9a6fe5a504e2f9d2b3804f930ec8eb0d997edbf66586057d7071e3": {
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "e517554bb7b31c0e3d4170a123db80e5ea64759fabbd4e79a37ffaf894ff7199": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "e5bb9a3db5e4eec0cdf1a0d7662a44c598f2f1723a76c351e673055866cafafb": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "e5e3c852702d2155cc7bacfe39c6fc5e488422bc50d62195065eea7c19cd7fdf": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "e63748f158b2ce1749c6336d8795477c93b479085362ff809f96b87de4c33fe0": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "e6f719f0fbba87b4bedf5923c68a0bb43d0cb96c1722f8ceebdfe516f9b6971c": {
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "e7b971622cf12c4847bf82aaad6db42422d1ffc0c32004ee46002a8b1c4311bd": {
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "e7c075a57643ca43086b937eb2ffddeceb10b1734bd673dfcb827781a088d9cc": {
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "e7e0b2a96b71d341c8e62f4f11359f7b689a61fd9b282781df343386679ca61a": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "e8150d30c4ab2049228f3559a92f0690e161eaa5c89f0f08bcad16cb9dd748b0": {
+      "sentiment": "negative",
+      "topics": [
+        "app_usability",
+        "billing"
+      ]
+    },
+    "e8dd757fa4025cad55836565781b9b4826c3379fbecab292477f739efec1ee70": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "e922be8d79262e2d20f227530d9e9badeb7ab42b28338bca32c7e77c60bda625": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "e9e825f45165db78d1f78cfccc6b66516329bf35684c44b68c5740a856d91ba7": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "eaeb5e615bb9b7407e4eb74c080d04e5343844be6cf7ae9b076119a48ea82815": {
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "f08fa3e84b324e8abf0462b26197f47c568aacb5b661462cfb8e6fadf182d011": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "f25bc9a7c6e3492e2d16437b170efe5b68a43243f72719c1c0c10ae691aeffe7": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "f25c01cace55eb46b880aa1c2b93dd8a53f633a34d6119639c0c5ec2457c3bb1": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "f2aaceddc3a33cbf00557bcc4ac2d184c835d61eeecb8a8cfa0ddca61e9bd0e8": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "f2d2bc738483b1aa387c1d388da8d13b03cbb0a00c53837498f33acdbe46f3ed": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "f438d9bac2111bca7fe35fb53a2ba3f2f24c4642afdc197b3713120825abe0fd": {
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "f4869dc516b64e334792338ecff2ea53b9fa6cab55d71d7db526c157cbeac641": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "f4c451a1a99fe85d2bda60a226daf351e72268f07cc0f74d9fc26ad1d9d6575f": {
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "f5f61f88dc0b2eea33fcfeaf8444582d5d09abff5d4c739aa45650b48f824239": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "f61437962e7244b1454033a7a019fa93f2e9bb4299017584f20a7341c5629b92": {
+      "sentiment": "negative",
+      "topics": [
+        "pricing",
+        "product_quality"
+      ]
+    },
+    "f6666b440fae7bcaa826843fd054851248d950ece38466344347d4038cd71277": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "f6dcfd888d030976487deb684fbf444fd5af221088cc111132cfcb3c66ebdaf5": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "f6de93d00d2312a063a49e81dee6994e6582bd9ba89003649aeaa9ac1bae12f5": {
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "f8377ae24df9e4aa6ae33e70fe2c9c92a18a8cf6e2b778a93542e1edf8b9541f": {
+      "sentiment": "neutral",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "fa8c278e598f701c9fe0d108698c7e967165fb8ea7a5721390657358865f220f": {
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "fc75565416fb4f04195c2962dda684b5b73f2469ce27d30ab90c5e7b75db40f8": {
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "fd54b1911850c3e1e1d3da455fddca58a76e9554aca68f3c5e1e3248182e15da": {
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "fe212d05a8105c7d4a33aeaf8722d5c3ca633393663f9207bb6f24f132cb8708": {
+      "sentiment": "positive",
+      "topics": []
+    },
+    "fe78aa551b9d6b35549e6d45fe6f71ab566499af3a340151d7b4ae55ca3a6803": {
+      "sentiment": "negative",
+      "topics": [
+        "customer_support",
+        "product_quality"
+      ]
+    },
+    "fefd07d0201dc8c798a197a4b5e0cc01641994ac312b8d52e3fa665afd28c71f": {
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "ff6f7edc48032eacd0411771084b6cb89ad7f5d9afb73431d570c1f7576d78fb": {
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "fffe9d95ef26613402829b9acc2b08369790b4d83955f7a919c236ade444d842": {
+      "sentiment": "neutral",
+      "topics": []
+    }
+  },
+  "format": 1
+}

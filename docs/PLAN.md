@@ -15,10 +15,11 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Python | 3.13 via uv, src layout, package `review_radar`, CLI with Typer. |
 | Storage | SQLite with a simple schema and a schema version in `PRAGMA user_version`. No migration framework. |
 | LLM | Anthropic API behind a `Classifier` protocol. Default model `claude-haiku-5-5`. Key only in `.env`. |
-| Demo mode | `FixtureClassifier` with canned answers keyed by review hash, plus a deterministic keyword/rating fallback. No key, no network, no cost. |
+| Demo mode | `FixtureClassifier` with canned answers keyed by review hash, plus a deterministic keyword/rating fallback. No key, no network, no cost. The fixtures (`fixtures/demo_analyses.json`) are generated from the sample ground truth by `scripts/build_demo_fixtures.py`, so demo on the sample is exact by construction; the fallback handles any other CSV. The fixture `prompt_version` is derived from the fixture content plus `FALLBACK_RULES_VERSION`, so changing either invalidates the demo cache rows; fallback answers are counted and printed in the report. `fixtures/` lives at the repo root, so demo `analyze` works only from a repo checkout (`uv run`), not from an installed wheel (accepted, like `.env` and the database path). |
 | Output format | Structured JSON per batch of 20 reviews, short ids (`r1…r20`), closed topic list, validated again with pydantic. |
+| Schema upgrades | One idempotent schema script (only `CREATE TABLE/INDEX IF NOT EXISTS` and the two PRAGMAs, in one transaction). A version bump may only add tables or indexes; on connect an older database from `MIN_UPGRADABLE_VERSION` up is upgraded by re-running the script, atomically. Older or newer versions are rejected. A non-additive change must raise `MIN_UPGRADABLE_VERSION`. No migration framework. |
 | Re-import key | Source + `review_id` when an id is present: the same id from another source is a different review. The source is casefolded for the id key (`Web` = `web`), the id itself is case-sensitive (`R1` ≠ `r1`); a missing source counts as `unknown`, so a blank source and the literal source `unknown` share one id space. The first stored copy wins and later edits under the same key are ignored. Without an id: sha256 of date + normalized text + source (the source is not casefolded here, so `Web` and `web` rows are two reviews). The same review exported once with and once without an id is stored twice. Known limitations, accepted. Changing the key format bumped the schema to version 2; a version 1 database is rejected with a hint to delete it and run ingest again (reviews are reproducible from the CSV). |
-| Cache | Analyses cached by (review hash, provider, model, prompt version). A rerun on the same CSV makes 0 calls. |
+| Cache | Analyses cached by (review hash, provider, model, prompt version). A rerun on the same CSV makes 0 calls. The cache is per normalized text (`text_hash`), so reviews sharing a text share one analysis; the rating sent to the classifier is the one of the earliest stored review with that text (accepted). Two reviews with the same text and different ratings share one analysis (accepted). |
 | Telegram | Send only (no commands). Idempotent: one summary per date unless `--force`. `--dry-run` prints the message. |
 | Dashboard | Jinja2 template with embedded JSON and a vendored Chart.js. Output `site/index.html`, opens from disk. |
 | Eval | `review-radar eval` compares predictions with generator ground truth; `--compare` runs Haiku 5.5 and Sonnet 5.5 on the same data and prints an accuracy / tokens / cost table for the README. |
@@ -99,9 +100,9 @@ Recorded after each stage review; picked up in the stage named in brackets.
 
 ### Stage 3
 
-- `storage.py`: `count_reviews` / `list_reviews` do not wrap `sqlite3.Error` / `ValidationError` in `StorageError`; wrap them before a CLI caller uses them (pydantic messages can contain review text) [4].
+- ~~`storage.py`: `count_reviews` / `list_reviews` do not wrap `sqlite3.Error` / `ValidationError` in `StorageError`; wrap them before a CLI caller uses them (pydantic messages can contain review text) [4].~~ Done in stage 4.
 - `storage.py`: a locked or read-only database is reported as "Cannot use ... as a database"; special-case locked/readonly messages and set `busy_timeout` [6].
-- `storage.py`: a naive `now` is stored without a timezone; require aware datetimes or convert to UTC [4].
+- ~~`storage.py`: a naive `now` is stored without a timezone; require aware datetimes or convert to UTC [4].~~ Done in stage 4.
 - `storage.py`: no option to report "same id, different content" on re-import [any].
 - `models.py`: `MAX_TEXT_LENGTH` lives in ingest; move it to `Review.text` `max_length` like the id/source limits [5].
 - `ingest.py`: the 20 MB cap does not bound the row count / memory for millions of tiny rows; consider a row cap or capped error list [any].
@@ -109,5 +110,30 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `cli.py`: exit code is 0 even when most rows were skipped; consider `--strict` [8].
 - `storage.py`: the database file holds review text and is created with default permissions; chmod 0o600 on POSIX [9].
 - Tests: the real-db guard relies only on the `DATABASE_PATH` env fixture; add a check that fails if a test resolves to `data/review_radar.db` [any].
-- `storage.py`: `PRAGMA foreign_keys = ON` and its test are unused until a foreign key exists [4].
+- ~~`storage.py`: `PRAGMA foreign_keys = ON` and its test are unused until a foreign key exists [4].~~ Done in stage 4.
 - Tests: `test_corrupt_database_is_a_clean_error` does not assert the file name in the message [any].
+
+### Stage 4
+
+- `classifier.py`: `ClassifierError.reason` is free-form; validate `[a-z0-9_]{1,64}` and fall back to `unknown_error` before the live classifier prints it [5].
+- `analysis.py`: the `ClassifierError` message (text-free by contract) is discarded; log it at WARNING with the batch index [5].
+- `analysis.py`: no stop after a fatal reason (auth, quota); add a fatal-reason set and count the rest as skipped [5].
+- `analysis.py`: `save_analyses`' inserted count is ignored; warn when it is lower than the batch [any].
+- `analysis.py`: the three count queries are not one snapshot; read them in one transaction [any].
+- `analysis.py`: `utc_stamp(now)` is called only for validation; compute the stamp once and pass it down [any].
+- `analysis.py`: usage summing via `sum(usages[1:], usages[0])` is opaque; use `functools.reduce` [any].
+- `analysis.py`: `AnalysisReport.failures` is a mutable dict in a frozen dataclass; wrap in `MappingProxyType` [any].
+- `cli.py`: `count_reviews` runs twice per analyze (CLI and service) [any].
+- `storage.py`: the version-0 check looks only at tables; check any `sqlite_master` object (views, triggers) [any].
+- `storage.py`: lookups use the stored `text_hash`, the primary key uses `cache_key(text)`; assert they agree in `save_analyses` [any].
+- `storage.py`: a v3 database missing the analyses table passes `connect`; later errors are misleading [any].
+- `storage.py`: `PendingText(*row)` depends on SELECT column order; unpack by name [any].
+- `storage.py`: `load_analyses` has no production caller yet (summary in stage 6) [6].
+- `storage.py`: foreign keys are off on purpose; re-enable `PRAGMA foreign_keys = ON` together with the first foreign key [any].
+- `fixture_classifier.py`: `from_file` has no size cap and does not catch `RecursionError` [any].
+- `fixture_classifier.py`: `ValidationError` is listed next to its base `ValueError` [any].
+- Tests: `conftest.py` does not pin `ANTHROPIC_MODEL` / `ANTHROPIC_COMPARE_MODEL`; pin them before the stage 5 cache key depends on them [5].
+- Tests: the CLI rerun test proves zero work only via output counts; make classify raise on the second run [any].
+- `analysis.py`: the batch that raised is counted as `not_run` together with the batches after it; count it as `aborted` [any].
+- `storage.py`: `load_analyses` maps a stored unknown topic to `other` with a warning instead of raising "stored data is invalid" [6].
+- `analysis.py`: reviews sharing a text reuse the earliest review's rating-driven fallback answer; accepted (see Cache decision), but the report does not count shared-text reviews with differing ratings [any].

@@ -12,6 +12,7 @@ from review_radar.models import (
     Sentiment,
     Topic,
     Usage,
+    normalize_topics,
     parse_topic,
 )
 
@@ -51,6 +52,26 @@ class TestParseTopic:
         with caplog.at_level(logging.WARNING, logger="review_radar.models"):
             assert parse_topic(raw) is Topic.OTHER
         assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+    @pytest.mark.parametrize(
+        "raw", ["ZEBRA-QUOKKA-9917 secret review text", b"ZEBRA-QUOKKA-9917", 5]
+    )
+    def test_the_raw_value_is_never_logged(
+        self, raw: object, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING, logger="review_radar.models"):
+            parse_topic(raw)
+
+        assert "ZEBRA" not in caplog.text
+        assert "QUOKKA" not in caplog.text
+        assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+    def test_the_warning_names_the_type_and_length(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING, logger="review_radar.models"):
+            parse_topic("weather")
+
+        assert "str" in caplog.text
+        assert "length 7" in caplog.text
 
     def test_known_value_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING, logger="review_radar.models"):
@@ -221,3 +242,76 @@ class TestUsage:
         u = Usage(input_tokens=0, output_tokens=0)
         with pytest.raises(ValidationError):
             u.input_tokens = 1  # type: ignore[misc]
+
+
+class TestNormalizeTopics:
+    def test_known_topics_pass_through_in_order(self) -> None:
+        result = normalize_topics(["billing", "pricing"])
+
+        assert result.topics == (Topic.BILLING, Topic.PRICING)
+        assert (result.unknown, result.truncated) == (0, 0)
+
+    def test_empty(self) -> None:
+        result = normalize_topics([])
+
+        assert (result.topics, result.unknown, result.truncated) == ((), 0, 0)
+
+    def test_unknown_values_become_other_and_are_counted(self) -> None:
+        result = normalize_topics(["weather", None, 5])
+
+        assert result.topics == (Topic.OTHER,)
+        assert result.unknown == 3
+        assert result.truncated == 0
+
+    def test_a_valid_other_is_not_unknown(self) -> None:
+        result = normalize_topics(["other", "pricing"])
+
+        assert result.topics == (Topic.OTHER, Topic.PRICING)
+        assert result.unknown == 0
+
+    def test_loose_case_and_whitespace_are_known_not_unknown(self) -> None:
+        result = normalize_topics([" Pricing "])
+
+        assert result.topics == (Topic.PRICING,)
+        assert result.unknown == 0
+
+    def test_duplicates_are_removed_but_unknown_repeats_are_all_counted(self) -> None:
+        result = normalize_topics(["pricing", "pricing", "weather", "weather"])
+
+        assert result.topics == (Topic.PRICING, Topic.OTHER)
+        assert result.unknown == 2
+        assert result.truncated == 0
+
+    def test_more_than_three_is_truncated_and_counted(self) -> None:
+        result = normalize_topics(["delivery_delay", "pricing", "billing", "packaging", "other"])
+
+        assert result.topics == (Topic.DELIVERY_DELAY, Topic.PRICING, Topic.BILLING)
+        assert result.unknown == 0
+        assert result.truncated == 2
+
+    def test_mixed_unknown_and_truncation(self) -> None:
+        raw = ["pricing", "weather", "billing", "packaging", "delivery_delay"]
+
+        result = normalize_topics(raw)
+
+        assert result.topics == (Topic.PRICING, Topic.BILLING, Topic.PACKAGING)
+        assert result.unknown == 1
+        assert result.truncated == 2
+
+    def test_accepts_any_iterable(self) -> None:
+        result = normalize_topics(t for t in ("pricing", "billing"))
+
+        assert result.topics == (Topic.PRICING, Topic.BILLING)
+
+    def test_analysis_uses_the_same_rules(self) -> None:
+        raw = ["pricing", "weather", "billing", "packaging", "delivery_delay"]
+
+        analysis = Analysis(sentiment=Sentiment.NEGATIVE, topics=raw, confidence=None)
+
+        assert analysis.topics == normalize_topics(raw).topics
+
+    def test_warnings_never_contain_the_raw_values(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING, logger="review_radar.models"):
+            normalize_topics(["ZEBRA-QUOKKA-9917", "a", "b", "c", "d"])
+
+        assert "ZEBRA" not in caplog.text

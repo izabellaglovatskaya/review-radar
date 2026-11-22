@@ -1,6 +1,9 @@
 """Command line interface for Review Radar."""
 
 import contextlib
+import logging
+import os
+import sys
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -8,11 +11,15 @@ import typer
 from pydantic import ValidationError
 
 from review_radar import __version__
-from review_radar.config import Settings
+from review_radar.analysis import AnalysisAborted, AnalysisReport, analyze_pending
+from review_radar.classifier import Classifier, ClassifierError
+from review_radar.config import PROJECT_ROOT, ConfigError, Mode, Settings
+from review_radar.fixture_classifier import FixtureClassifier
 from review_radar.ingest import IngestError, IngestResult, read_reviews
-from review_radar.storage import SaveResult, StorageError, connect, save_reviews
+from review_radar.storage import SaveResult, StorageError, connect, count_reviews, save_reviews
 
 MAX_LISTED_LINES = 10
+DEMO_FIXTURES = PROJECT_ROOT / "fixtures" / "demo_analyses.json"
 
 app = typer.Typer(
     name="review-radar",
@@ -39,8 +46,37 @@ def main(
             help="Show the version and exit.",
         ),
     ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Also log progress (INFO) to stderr.")
+    ] = False,
 ) -> None:
     """Review Radar command line interface."""
+    _configure_logging(verbose)
+
+
+class _StderrHandler(logging.Handler):
+    """Write to whatever `sys.stderr` is at emit time (so it survives stream swapping)."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            sys.stderr.write(self.format(record) + os.linesep)
+        except Exception:  # noqa: BLE001 (logging must never break the command)
+            self.handleError(record)
+
+
+def _configure_logging(verbose: bool) -> None:
+    """Log the `review_radar` package to stderr: WARNING by default, INFO with --verbose.
+
+    Only the package logger is configured, and any handler of ours from an earlier call is
+    replaced, so calling this repeatedly (e.g. in tests) never stacks handlers.
+    """
+    package_logger = logging.getLogger("review_radar")
+    for handler in [h for h in package_logger.handlers if isinstance(h, _StderrHandler)]:
+        package_logger.removeHandler(handler)
+    handler = _StderrHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    package_logger.addHandler(handler)
+    package_logger.setLevel(logging.INFO if verbose else logging.WARNING)
 
 
 def _format_lines(lines: list[int]) -> str:
@@ -91,6 +127,72 @@ def ingest(
         _fail(exc)
     typer.echo(f"New: {saved.new}")
     typer.echo(f"Already stored: {saved.existing}")
+
+
+@app.command()
+def analyze() -> None:
+    """Classify stored reviews that have no cached analysis yet (no review text is printed)."""
+    settings = _load_settings()
+    try:
+        mode = settings.resolved_mode()
+    except ConfigError as exc:
+        _fail(exc)
+    if mode is Mode.LIVE:
+        typer.echo(
+            "Error: Live mode is not available yet (stage 5); set REVIEW_RADAR_MODE=demo.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        classifier = FixtureClassifier.from_file(DEMO_FIXTURES)
+        report = _analyze(settings, classifier)
+    except AnalysisAborted as exc:
+        _echo_analysis(classifier, exc.report)
+        _fail(f"analysis stopped: {_abort_detail(exc)}.")
+    except (StorageError, ClassifierError) as exc:
+        _fail(exc)
+    if report is None:
+        typer.echo("No reviews in the database; run ingest first.", err=True)
+        raise typer.Exit(1)
+    _echo_analysis(classifier, report)
+    if report.failed or report.unexpected_results:
+        raise typer.Exit(1)
+
+
+def _abort_detail(exc: AnalysisAborted) -> str:
+    """Name the cause: a StorageError message is text-free; anything else shows only its type."""
+    cause = exc.__cause__
+    if isinstance(cause, StorageError):
+        return str(cause).rstrip(".")
+    return type(cause).__name__
+
+
+def _analyze(settings: Settings, classifier: Classifier) -> AnalysisReport | None:
+    """Return the report, or None when the database holds no reviews."""
+    with contextlib.closing(connect(settings.database_path)) as conn:
+        if count_reviews(conn) == 0:
+            return None
+        return analyze_pending(conn, classifier)
+
+
+def _echo_analysis(classifier: Classifier, report: AnalysisReport) -> None:
+    typer.echo(
+        f"Classifier: {classifier.provider}/{classifier.model} (prompt {classifier.prompt_version})"
+    )
+    typer.echo(f"Reviews: {report.reviews_total}")
+    typer.echo(f"Analyzed now: {report.analyzed}")
+    typer.echo(f"From cache: {report.cached}")
+    typer.echo(f"Failed: {report.failed}")
+    for reason, count in report.failures.items():
+        typer.echo(f"  {reason}: {count}")
+    for label, value in (
+        ("Fallback (keyword rules)", report.fallback),
+        ("Unknown topics", report.unknown_topics),
+        ("Truncated topics", report.truncated_topics),
+        ("Unexpected results", report.unexpected_results),
+    ):
+        if value:
+            typer.echo(f"{label}: {value}")
 
 
 def _load_settings() -> Settings:

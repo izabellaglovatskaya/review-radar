@@ -3,6 +3,8 @@
 import datetime as dt
 import json
 import logging
+from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Any, Self
 
@@ -44,20 +46,77 @@ class Topic(StrEnum):
     OTHER = "other"
 
 
-def parse_topic(value: Any) -> Topic:
-    """Map a raw value to a Topic; unknown values become Topic.OTHER (with a warning).
-
-    Known values match case- and whitespace-insensitively.
-    """
+def _lookup_topic(value: Any) -> Topic | None:
+    """Return the Topic for a known value (case- and whitespace-insensitive), else None."""
     if isinstance(value, Topic):
         return value
     if isinstance(value, str):
         try:
             return Topic(value.strip().lower())
         except ValueError:
-            pass
-    logger.warning("Unknown topic %r mapped to %r", value, Topic.OTHER.value)
-    return Topic.OTHER
+            return None
+    return None
+
+
+def _warn_unknown(value: Any) -> None:
+    # Never log the value itself: model output can quote review text.
+    detail = f"str, length {len(value)}" if isinstance(value, str) else type(value).__name__
+    logger.warning("Unknown topic (%s) mapped to %r", detail, Topic.OTHER.value)
+
+
+def parse_topic(value: Any) -> Topic:
+    """Map a raw value to a Topic; unknown values become Topic.OTHER (with a warning).
+
+    Known values match case- and whitespace-insensitively.
+    """
+    topic = _lookup_topic(value)
+    if topic is None:
+        _warn_unknown(value)
+        return Topic.OTHER
+    return topic
+
+
+@dataclass(frozen=True)
+class TopicNormalization:
+    """Result of `normalize_topics`.
+
+    `unknown` counts raw values that were not valid topics (each occurrence, repeats included);
+    `truncated` counts unique topics dropped to stay within `MAX_TOPICS`.
+    """
+
+    topics: tuple[Topic, ...]
+    unknown: int
+    truncated: int
+
+
+def normalize_topics(raw: Iterable[object]) -> TopicNormalization:
+    """Apply the topic rules to raw classifier output.
+
+    Unknown values become `other`, duplicates are removed keeping order, and more than
+    `MAX_TOPICS` unique topics are truncated, preferring known topics over `other` (a warning
+    is logged for each problem, never with the raw value). Every classifier must pass its raw
+    topics through this function and report the counts in `ClassifyResult`.
+    """
+    parsed: list[Topic] = []
+    unknown = 0
+    for value in raw:
+        topic = _lookup_topic(value)
+        if topic is None:
+            unknown += 1
+            _warn_unknown(value)
+            topic = Topic.OTHER
+        parsed.append(topic)
+    unique = tuple(dict.fromkeys(parsed))
+    truncated = 0
+    if len(unique) > MAX_TOPICS:
+        logger.warning("Truncating %d topics to %d", len(unique), MAX_TOPICS)
+        known = [t for t in unique if t is not Topic.OTHER]
+        # After dedup there is at most one OTHER, so more than MAX_TOPICS unique
+        # topics means at least MAX_TOPICS known ones: OTHER never gets a slot.
+        kept = tuple(known[:MAX_TOPICS])
+        truncated = len(unique) - len(kept)
+        unique = kept
+    return TopicNormalization(topics=unique, unknown=unknown, truncated=truncated)
 
 
 class Review(BaseModel):
@@ -98,14 +157,7 @@ class Analysis(BaseModel):
     def _normalize_topics(cls, value: Any) -> tuple[Topic, ...]:
         if isinstance(value, str) or not hasattr(value, "__iter__"):
             raise ValueError("topics must be a sequence")
-        unique = tuple(dict.fromkeys(parse_topic(v) for v in value))
-        if len(unique) > MAX_TOPICS:
-            logger.warning("Truncating %d topics to %d", len(unique), MAX_TOPICS)
-            known = [t for t in unique if t is not Topic.OTHER]
-            # After dedup there is at most one OTHER, so more than MAX_TOPICS unique
-            # topics means at least MAX_TOPICS known ones: OTHER never gets a slot.
-            unique = tuple(known[:MAX_TOPICS])
-        return unique
+        return normalize_topics(value).topics
 
 
 class Usage(BaseModel):
