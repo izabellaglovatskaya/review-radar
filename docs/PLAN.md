@@ -56,3 +56,23 @@ One run over 300 reviews: about 39k input and 9.3k output tokens.
 | Claude Sonnet 5.5 | 2.00 / 10.00 | ≈ $0.17 |
 
 Reruns on the same data cost nothing (cache). Demo mode costs nothing.
+
+## Review backlog (LOW findings)
+
+Recorded after each stage review; picked up in the stage named in brackets.
+
+### Stage 1
+
+- `models.py`: the topic validator accepts any iterable (`bytes`, `dict`, `set`); accept only `list | tuple` [5].
+- `models.py`: blank `external_id` / `source` are stored as-is; map blank strings to `None` [2].
+- `models.py`: `rating` accepts `True` (lax mode); use a strict int or rely on CSV ingest passing strings [2].
+- `models.py`, `config.py`: validators take `value: Any`; use `object` for untrusted input [any].
+- `models.py`, `config.py`: public classes need one-line docstrings [any].
+- `config.py`: `REVIEW_RADAR_MODE` is case-sensitive (`LIVE` fails); lowercase and strip before validation [8].
+- `config.py`: model names accept empty or whitespace values; add `min_length=1` with stripping [5].
+- `config.py`: non-blank secrets are not stripped (a pasted trailing newline breaks auth later) [5].
+- `config.py`: log the resolved mode and database path when the CLI starts [8].
+- Tests: always build `Settings` with `_env_file=None`, so a developer's real `.env` is never read [all].
+- Tests: nothing asserts that `Settings` is frozen [any].
+- Tests contain `# type: ignore` comments but no type checker runs; add mypy/pyright to dev deps and checks, or drop the comments [9].
+- `pyproject.toml`: dependency floors are the newest releases (`pydantic>=2.14.4`, `pydantic-settings>=2.16.3`); lower them to the oldest versions actually needed [10].

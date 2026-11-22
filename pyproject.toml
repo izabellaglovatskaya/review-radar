@@ -5,6 +5,8 @@ description = "Turns a CSV of customer reviews into a daily Telegram summary and
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "pydantic>=2.14.4",
+    "pydantic-settings>=2.16.3",
     "typer>=0.15",
 ]
 
