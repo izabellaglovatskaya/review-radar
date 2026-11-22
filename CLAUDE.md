@@ -22,6 +22,22 @@ Use the **tdd-guide** agent and follow red → green → refactor: write a faili
 - If the stage touches input parsing, the database, Telegram, the LLM client, secrets or CI, also run the
   **security-reviewer** agent.
 
+### Agents: which one and when
+
+Project agents live in `.claude/agents/` (copied from
+[everything-claude-code](https://github.com/affaan-m/everything-claude-code), MIT license alongside).
+`tdd-guide`, `code-reviewer`, `security-reviewer` and `planner` come from the global Claude Code setup.
+
+| Agent | When |
+|---|---|
+| `tdd-guide` | While writing any code (tests first). |
+| `code-reviewer` | After every stage. |
+| `python-reviewer` | After every stage that changes Python code. |
+| `security-reviewer` | After stages touching input parsing, the database, Telegram, the LLM client, secrets or CI. |
+| `silent-failure-hunter` | After stages with the model, cache, retries or Telegram sending (stages 4, 5, 6, 8). |
+| `commit-reviewer` | Before every commit (checks the message and whether the diff should be split). |
+| `fastapi-reviewer` | Not used here (no FastAPI in this project); kept as a template for future projects. |
+
 ### 3. No silent fixes
 
 Present reviewer findings as a list (severity, file, what is wrong); the owner decides what gets fixed.
