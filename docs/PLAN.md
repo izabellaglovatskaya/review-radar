@@ -21,7 +21,7 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Telegram | Send only (no commands). Idempotent: one summary per date unless `--force`. `--dry-run` prints the message. |
 | Dashboard | Jinja2 template with embedded JSON and a vendored Chart.js. Output `site/index.html`, opens from disk. |
 | Eval | `review-radar eval` compares predictions with generator ground truth; `--compare` runs Haiku 5.5 and Sonnet 5.5 on the same data and prints an accuracy / tokens / cost table for the README. |
-| CI | GitHub Actions on Ubuntu only: ruff and pytest. |
+| CI | GitHub Actions on Ubuntu only: `uv sync --locked`, ruff, pytest, and gitleaks over the full git history. |
 | Publishing | No GitHub Pages for now (until the repository is made public). README uses screenshots. |
 | Scheduling | The interface is `review-radar run`. Windows Task Scheduler setup is documented, not automated. |
 
@@ -40,7 +40,7 @@ One stage = one commit. Tests first (tdd-guide), code review after each stage.
 | 6 | Daily summary and Telegram sender | 3–4 |
 | 7 | Static dashboard | 4–5 |
 | 8 | End-to-end `run --demo`; `eval` with Haiku vs Sonnet comparison table | 3–4 |
-| 9 | CI on Ubuntu | 1–1.5 |
+| 9 | CI on Ubuntu: `uv sync --locked`, ruff, pytest, gitleaks over the full history | 1–1.5 |
 | 10 | README, architecture notes, screenshots, cost table | 2–3 |
 
 Total: 29–37 h, 33–43 h with review rounds.
@@ -48,7 +48,7 @@ Total: 29–37 h, 33–43 h with review rounds.
 ## Cost estimate (live mode)
 
 About 130 input and 31 output tokens per review with batches of 20 (to be measured with the `runs` table).
-One run over 300 reviews: about 39k input and 9.5k output tokens.
+One run over 300 reviews: about 39k input and 9.3k output tokens.
 
 | Model | $ per 1M tokens (in / out) | 300 reviews |
 |---|---|---|

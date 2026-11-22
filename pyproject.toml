@@ -29,7 +29,7 @@ packages = ["src/review_radar"]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-src = ["src", "scripts", "tests"]
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
@@ -40,7 +40,10 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --strict-markers --cov --cov-report=term-missing"
+markers = [
+    "live: calls a real model or API; opt-in with -m live",
+]
 
 [tool.coverage.run]
 source = ["review_radar"]

@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 .claude/settings.local.json
+# Other local Claude files (e.g. settings.local.json.bak). .claude/agents stays committed.
+.claude/**/*.local.*
 
 # Local databases
 *.db
@@ -25,6 +27,8 @@ __pycache__/
 .coverage.*
 htmlcov/
 coverage.xml
+dist/
+*.log
 
 # OS / editor
 .DS_Store
