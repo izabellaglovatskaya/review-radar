@@ -81,6 +81,22 @@ class TestReview:
     def test_rating_boundaries(self, rating: int) -> None:
         assert make_review(rating=rating).rating == rating
 
+    @pytest.mark.parametrize("rating", [True, False, "4", 4.0])
+    def test_rating_is_strict(self, rating: object) -> None:
+        with pytest.raises(ValidationError):
+            make_review(rating=rating)
+
+    @pytest.mark.parametrize("value", ["", "   ", chr(9) + chr(10)])
+    def test_blank_external_id_and_source_become_none(self, value: str) -> None:
+        r = make_review(external_id=value, source=value)
+        assert r.external_id is None
+        assert r.source is None
+
+    def test_external_id_and_source_are_stripped(self) -> None:
+        r = make_review(external_id="  r1 ", source=" web ")
+        assert r.external_id == "r1"
+        assert r.source == "web"
+
     def test_bad_date_rejected(self) -> None:
         with pytest.raises(ValidationError):
             make_review(review_date="not a date")

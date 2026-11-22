@@ -5,7 +5,14 @@ import logging
 from enum import StrEnum
 from typing import Annotated, Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    StringConstraints,
+    field_validator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +60,16 @@ class Review(BaseModel):
 
     external_id: str | None
     review_date: dt.date
-    rating: Annotated[int, Field(ge=1, le=5)] | None
+    rating: Annotated[StrictInt, Field(ge=1, le=5)] | None
     text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     source: str | None
+
+    @field_validator("external_id", "source", mode="before")
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 class Analysis(BaseModel):

@@ -64,8 +64,8 @@ Recorded after each stage review; picked up in the stage named in brackets.
 ### Stage 1
 
 - `models.py`: the topic validator accepts any iterable (`bytes`, `dict`, `set`); accept only `list | tuple` [5].
-- `models.py`: blank `external_id` / `source` are stored as-is; map blank strings to `None` [2].
-- `models.py`: `rating` accepts `True` (lax mode); use a strict int or rely on CSV ingest passing strings [2].
+- ~~`models.py`: blank `external_id` / `source` are stored as-is; map blank strings to `None` [2].~~ Done in stage 2.
+- ~~`models.py`: `rating` accepts `True` (lax mode); use a strict int or rely on CSV ingest passing strings [2].~~ Done in stage 2.
 - `models.py`, `config.py`: validators take `value: Any`; use `object` for untrusted input [any].
 - `models.py`, `config.py`: public classes need one-line docstrings [any].
 - `config.py`: `REVIEW_RADAR_MODE` is case-sensitive (`LIVE` fails); lowercase and strip before validation [8].
@@ -76,3 +76,22 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - Tests: nothing asserts that `Settings` is frozen [any].
 - Tests contain `# type: ignore` comments but no type checker runs; add mypy/pyright to dev deps and checks, or drop the comments [9].
 - `pyproject.toml`: dependency floors are the newest releases (`pydantic>=2.14.4`, `pydantic-settings>=2.16.3`); lower them to the oldest versions actually needed [10].
+
+### Stage 2
+
+- `ingest.py`: no file-size cap before `read_bytes()`; add `MAX_FILE_BYTES` and raise `IngestError` above it [3].
+- `ingest.py`: a directory path gives "Permission denied" on Windows; check `is_file()` first and say "Not a file" [3].
+- `ingest.py`: with `--encoding utf-8` on a BOM file the error is a misleading "Missing required column"; strip a leading BOM after decoding [3].
+- `ingest.py`: a field over 131072 characters aborts the whole file; reword the message to say the field is too large [3].
+- `ingest.py`: the delimiter is sniffed with `str.splitlines()`, which splits on more characters than csv; use the first csv-parsed row [3].
+- `ingest.py`: a trailing delimiter on data rows (Excel `;` exports) makes every row `wrong_field_count`; consider tolerating trailing empty cells [3].
+- `models.py`: `external_id` and `source` have no length limit; add `max_length` before they reach the database [3].
+- `ingest.py`: after a recoverable malformed row, a contrived tail with an even number of quotes that still opens a quoted field could leave a bogus continuation row; it is usually counted as `wrong_field_count`, but could be imported if it happens to be a valid row. Accepted risk; revisit if real exports hit it [any].
+- `cli.py`: `ingest` requires `--dry-run` until storage exists; make saving the default in stage 3 [3].
+- Storage: decide the idempotency key for re-imports (unique `external_id`, fallback hash of date + text + source for rows without an id) so re-running ingest never double-counts the daily summary [3].
+- `MAX_TEXT_LENGTH` (2000 chars) is not tied to the token budget; revisit with the prompt [5].
+- Eval needs ground truth keyed by `review_id`, so it only runs on generator data; say so in the CLI help and README [8].
+- `scripts/generate_reviews.py`: `generate()` does not validate `n` and `days`; the two output files are not written atomically; the company name is hardcoded in one template [10].
+- `scripts/generate_reviews.py`, `ingest.py`: a few public classes and functions lack docstrings [any].
+- `tests/test_generate_reviews.py`: `import random` inside a test function [any].
+- README: explain that ratings are deliberately noisy against sentiment, so a rating-based fallback scores lower in eval [10].
