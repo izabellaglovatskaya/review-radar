@@ -155,8 +155,8 @@ class Analysis(BaseModel):
     @field_validator("topics", mode="before")
     @classmethod
     def _normalize_topics(cls, value: Any) -> tuple[Topic, ...]:
-        if isinstance(value, str) or not hasattr(value, "__iter__"):
-            raise ValueError("topics must be a sequence")
+        if not isinstance(value, list | tuple):
+            raise ValueError("topics must be a list or tuple")
         return normalize_topics(value).topics
 
 

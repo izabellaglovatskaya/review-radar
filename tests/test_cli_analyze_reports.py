@@ -213,7 +213,8 @@ class TestAbortedRun:
         assert "Reviews: 45" in result.output
         assert "Analyzed now: 20" in result.output
         assert "Failed: 25" in result.output
-        assert "  not_run: 25" in result.output
+        assert "  save_failed: 20" in result.output
+        assert "  not_run: 5" in result.output
         assert "Error: analysis stopped: Cannot save analyses: disk full." in result.output
         assert "Traceback" not in result.output
         assert FAKE_TEXT not in result.output

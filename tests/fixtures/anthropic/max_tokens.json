@@ -1,0 +1,15 @@
+{
+  "id": "msg_fixture_max_tokens",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"results\":[{\"id\":\"r1\",\"sentiment\":\"positive\",\"topics\":[],\"confidence\":0.95},{\"id\":\"r2\",\"sentiment\":\"neg"
+    }
+  ],
+  "stop_reason": "max_tokens",
+  "stop_sequence": null,
+  "usage": {"input_tokens": 410, "output_tokens": 4096}
+}

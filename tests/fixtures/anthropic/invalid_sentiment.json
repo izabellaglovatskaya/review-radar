@@ -1,0 +1,15 @@
+{
+  "id": "msg_fixture_invalid_sentiment",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"results\":[{\"id\":\"r1\",\"sentiment\":\"positive\",\"topics\":[],\"confidence\":0.95},{\"id\":\"r2\",\"sentiment\":\"furious\",\"topics\":[\"delivery_delay\"],\"confidence\":0.9},{\"id\":\"r3\",\"sentiment\":\"negative\",\"topics\":[\"pricing\"],\"confidence\":0.85}]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {"input_tokens": 410, "output_tokens": 90}
+}

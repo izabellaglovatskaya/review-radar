@@ -184,7 +184,10 @@ class TestAnalysis:
     def test_exactly_three_kept(self) -> None:
         assert len(make_analysis(topics=("pricing", "billing", "packaging")).topics) == 3
 
-    @pytest.mark.parametrize("bad", ["pricing", 5, None])
+    @pytest.mark.parametrize(
+        "bad",
+        ["pricing", 5, None, b"pricing", {"pricing"}, {"pricing": 1}, (t for t in ("pricing",))],
+    )
     def test_non_sequence_topics_rejected(self, bad: object) -> None:
         with pytest.raises(ValidationError):
             make_analysis(topics=bad)

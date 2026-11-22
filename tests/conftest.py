@@ -12,11 +12,17 @@ def _isolated_database_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.fixture(autouse=True)
-def _no_real_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+def _no_real_secrets(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
     """Blank every secret and force demo mode, so a developer's real `.env` is never used.
 
     Environment variables take priority over `.env`, and blank secrets count as unset.
+    The model names are always pinned (the cache key depends on them). Tests marked `live`
+    are the one exception to the blanking: they read the developer's key through `Settings()`.
     """
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
+    monkeypatch.setenv("ANTHROPIC_COMPARE_MODEL", "claude-sonnet-5-5")
+    if request.node.get_closest_marker("live"):
+        return
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "")

@@ -378,8 +378,8 @@ class TestLogging:
         assert len(info) == 1
         assert "analyzed=1" in info[0].getMessage()
         assert "failed=1" in info[0].getMessage()
-        assert len(warnings) == 1
-        assert "rate_limited" in warnings[0].getMessage()
+        assert len(warnings) == 2  # the batch warning and the per-reason summary
+        assert all("rate_limited" in w.getMessage() for w in warnings)
         assert FAKE_TEXT not in caplog.text
         assert "ZEBRA" not in caplog.text
 
@@ -394,8 +394,10 @@ class TestLogging:
         with caplog.at_level(logging.WARNING):
             analyze_pending(conn, spy, batch_size=2)
 
-        assert len([r for r in caplog.records if "a_reason" in r.getMessage()]) == 1
-        assert len([r for r in caplog.records if "b_reason" in r.getMessage()]) == 1
+        messages = [r.getMessage() for r in caplog.records]
+        summaries = [m for m in messages if "Analysis failed for" in m]
+        assert len([m for m in summaries if "a_reason" in m]) == 1
+        assert len([m for m in summaries if "b_reason" in m]) == 1
 
 
 class TestCounters:
@@ -461,7 +463,7 @@ class TestAborted:
         report = excinfo.value.report
         assert isinstance(excinfo.value.__cause__, StorageError)
         assert (report.reviews_total, report.analyzed, report.cached, report.failed) == (6, 2, 0, 4)
-        assert report.failures == {"not_run": 4}
+        assert report.failures == {"save_failed": 2, "not_run": 2}
         assert report.reviews_total == report.analyzed + report.cached + report.failed
         saved = load_analyses(conn, provider="spy", model="spy-1", prompt_version="p1")
         assert set(saved) == {text_hash("review number 0"), text_hash("review number 1")}

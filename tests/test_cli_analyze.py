@@ -51,6 +51,8 @@ def test_sample_ingest_then_analyze(tmp_path: Path) -> None:
         "Analyzed now: 300",
         "From cache: 0",
         "Failed: 0",
+        "Tokens: 0 in / 0 out",
+        "Estimated cost: $0 (demo)",
     ]
 
 
@@ -112,18 +114,6 @@ def test_output_never_contains_review_text(tmp_path: Path) -> None:
 
     assert FAKE_TEXT not in result.output
     assert "ZEBRA" not in result.output
-
-
-def test_live_mode_is_not_available_yet(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("REVIEW_RADAR_MODE", "live")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-FAKE-test")
-
-    result = runner.invoke(app, ["analyze"])
-
-    assert result.exit_code == 2
-    assert "Live mode is not available yet (stage 5); set REVIEW_RADAR_MODE=demo." in result.output
-    assert "sk-ant" not in result.output
-    assert not db_path().exists()
 
 
 def test_live_without_a_key_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:

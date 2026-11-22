@@ -2,12 +2,14 @@
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, StringConstraints, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class ConfigError(Exception):
@@ -25,8 +27,10 @@ class Settings(BaseSettings):
 
     mode: Mode = Field(default=Mode.AUTO, validation_alias="REVIEW_RADAR_MODE")
     anthropic_api_key: SecretStr | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
-    anthropic_model: str = Field(default="claude-haiku-5-5", validation_alias="ANTHROPIC_MODEL")
-    anthropic_compare_model: str = Field(
+    anthropic_model: ModelName = Field(
+        default="claude-haiku-5-5", validation_alias="ANTHROPIC_MODEL"
+    )
+    anthropic_compare_model: ModelName = Field(
         default="claude-sonnet-5-5", validation_alias="ANTHROPIC_COMPARE_MODEL"
     )
     telegram_bot_token: SecretStr | None = Field(
@@ -40,8 +44,8 @@ class Settings(BaseSettings):
     @field_validator("anthropic_api_key", "telegram_bot_token", "telegram_chat_id", mode="before")
     @classmethod
     def _blank_secret_is_none(cls, value: Any) -> Any:
-        if isinstance(value, str) and not value.strip():
-            return None
+        if isinstance(value, str):
+            return value.strip() or None
         return value
 
     @field_validator("database_path", mode="after")

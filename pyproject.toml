@@ -5,6 +5,7 @@ description = "Turns a CSV of customer reviews into a daily Telegram summary and
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "anthropic>=2.12.0",
     "pydantic>=2.14.4",
     "pydantic-settings>=2.16.3",
     "typer>=0.15",
@@ -43,7 +44,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts"]
-addopts = "-ra --strict-markers --cov --cov-report=term-missing"
+addopts = "-ra --strict-markers --cov --cov-report=term-missing -m 'not live'"
 markers = [
     "live: calls a real model or API; opt-in with -m live",
 ]

@@ -22,16 +22,18 @@ or a hash of date + normalized text + source) and the first stored copy of a key
 modified.
 
 Schema versions: 1 (stage 3) keyed reviews by external id alone; 2 scopes the id by source;
-3 adds the `analyses` cache table. A version 1 database cannot be upgraded in place and must be
-recreated from the CSV; version 2 is upgraded.
+3 adds the `analyses` cache table; 4 adds the `runs` table (one row per analyze run, with token
+usage and estimated cost). A version 1 database cannot be upgraded in place and must be
+recreated from the CSV; versions 2 and 3 are upgraded.
 """
 
 import datetime as dt
 import json
 import logging
 import sqlite3
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from review_radar.hashing import cache_key, text_hash
@@ -39,7 +41,7 @@ from review_radar.models import Analysis, Review, dedup_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MIN_UPGRADABLE_VERSION = 2
 APPLICATION_ID = 0x52765264  # ASCII "RvRd"
 
@@ -71,8 +73,31 @@ CREATE TABLE IF NOT EXISTS analyses (
 );
 CREATE INDEX IF NOT EXISTS idx_analyses_lookup
     ON analyses (text_hash, provider, model, prompt_version);
+CREATE TABLE IF NOT EXISTS runs (
+    id INTEGER PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    reviews_total INTEGER NOT NULL,
+    analyzed INTEGER NOT NULL,
+    cached INTEGER NOT NULL,
+    failed INTEGER NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cost_usd TEXT,
+    fatal_reason TEXT,
+    not_analyzed_limit INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT NOT NULL CHECK (outcome IN (
+        'completed', 'fatal', 'aborted', 'interrupted', 'stopped_transient',
+        'call_budget_exceeded'
+    )),
+    failures TEXT NOT NULL,
+    api_calls INTEGER NOT NULL DEFAULT 0
+);
 PRAGMA application_id = 1383486052;
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 COMMIT;
 """
 
@@ -121,6 +146,21 @@ SELECT text_hash, sentiment, topics, confidence FROM analyses
 WHERE provider = ? AND model = ? AND prompt_version = ?
 """
 
+_INSERT_RUN = """
+INSERT INTO runs
+    (started_at, finished_at, provider, model, prompt_version, reviews_total, analyzed, cached,
+     failed, input_tokens, output_tokens, cost_usd, fatal_reason, not_analyzed_limit, outcome,
+     failures, api_calls)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_SELECT_RUNS = """
+SELECT started_at, finished_at, provider, model, prompt_version, reviews_total, analyzed, cached,
+       failed, input_tokens, output_tokens, cost_usd, fatal_reason, not_analyzed_limit, outcome,
+       failures, api_calls
+FROM runs ORDER BY id
+"""
+
 
 class StorageError(Exception):
     """The database cannot be opened, validated or written. Never carries review text."""
@@ -146,6 +186,34 @@ class PendingText:
     text: str
     rating: int | None
     review_count: int
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    """One analyze run. Counts are in reviews; `cost_usd` is None when the model has no price.
+
+    `fatal_reason` is set when the run was stopped by a fatal classifier error. `outcome` is one
+    of completed, fatal, aborted, interrupted, stopped_transient, call_budget_exceeded.
+    `failures` maps a reason code to a number of reviews (counts only, never text).
+    """
+
+    started_at: dt.datetime
+    finished_at: dt.datetime
+    provider: str
+    model: str
+    prompt_version: str
+    reviews_total: int
+    analyzed: int
+    cached: int
+    failed: int
+    input_tokens: int
+    output_tokens: int
+    cost_usd: Decimal | None
+    fatal_reason: str | None
+    not_analyzed_limit: int = 0
+    outcome: str = "completed"
+    failures: Mapping[str, int] = field(default_factory=dict)
+    api_calls: int = 0
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -345,3 +413,95 @@ def load_analyses(
         }
     except ValueError:  # includes pydantic.ValidationError
         raise _unreadable("analyses") from None
+
+
+def save_run(conn: sqlite3.Connection, record: RunRecord) -> int:
+    """Store one run row in its own transaction and return its id.
+
+    Raises ValueError for a naive timestamp.
+    """
+    params = (
+        utc_stamp(record.started_at),
+        utc_stamp(record.finished_at),
+        record.provider,
+        record.model,
+        record.prompt_version,
+        record.reviews_total,
+        record.analyzed,
+        record.cached,
+        record.failed,
+        record.input_tokens,
+        record.output_tokens,
+        None if record.cost_usd is None else str(record.cost_usd),
+        record.fatal_reason,
+        record.not_analyzed_limit,
+        record.outcome,
+        json.dumps(dict(record.failures), sort_keys=True),
+        record.api_calls,
+    )
+    try:
+        with conn:
+            cursor = conn.execute(_INSERT_RUN, params)
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot save the run: {_reason(exc)}.") from None
+    logger.info("Saved run %s", cursor.lastrowid)
+    return int(cursor.lastrowid or 0)
+
+
+def list_runs(conn: sqlite3.Connection) -> list[RunRecord]:
+    """Return all recorded runs, oldest first."""
+    try:
+        rows = conn.execute(_SELECT_RUNS).fetchall()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read runs: {_reason(exc)}.") from None
+    try:
+        return [
+            RunRecord(
+                started_at=dt.datetime.fromisoformat(started),
+                finished_at=dt.datetime.fromisoformat(finished),
+                provider=provider,
+                model=model,
+                prompt_version=prompt_version,
+                reviews_total=total,
+                analyzed=analyzed,
+                cached=cached,
+                failed=failed,
+                input_tokens=tokens_in,
+                output_tokens=tokens_out,
+                cost_usd=None if cost is None else Decimal(cost),
+                fatal_reason=fatal,
+                not_analyzed_limit=not_analyzed,
+                outcome=outcome,
+                failures=_failures(failures),
+                api_calls=api_calls,
+            )
+            for (
+                started,
+                finished,
+                provider,
+                model,
+                prompt_version,
+                total,
+                analyzed,
+                cached,
+                failed,
+                tokens_in,
+                tokens_out,
+                cost,
+                fatal,
+                not_analyzed,
+                outcome,
+                failures,
+                api_calls,
+            ) in rows
+        ]
+    except (ValueError, TypeError, InvalidOperation):
+        raise _unreadable("runs") from None
+
+
+def _failures(raw: str) -> dict[str, int]:
+    """Parse the stored failures JSON (a reason -> count object); ValueError if it is not."""
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("failures must be a JSON object")
+    return {str(reason): int(count) for reason, count in parsed.items()}

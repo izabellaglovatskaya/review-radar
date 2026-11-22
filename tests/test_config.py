@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 
 from review_radar.config import PROJECT_ROOT, ConfigError, Mode, Settings
 
@@ -191,3 +192,46 @@ def test_telegram_chat_id_without_token_raises(monkeypatch: pytest.MonkeyPatch) 
     with pytest.raises(ConfigError, match="TELEGRAM_BOT_TOKEN") as exc:
         make().telegram_enabled()
     assert FAKE_CHAT not in str(exc.value)
+
+
+@pytest.mark.parametrize("name", ["ANTHROPIC_MODEL", "ANTHROPIC_COMPARE_MODEL"])
+@pytest.mark.parametrize("value", ["", "   "])
+def test_blank_model_name_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
+) -> None:
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match=name):
+        make()
+
+
+def test_model_names_are_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_MODEL", "  claude-haiku-5-5\n")
+    monkeypatch.setenv("ANTHROPIC_COMPARE_MODEL", "\tclaude-sonnet-5-5 ")
+
+    s = make()
+
+    assert s.anthropic_model == "claude-haiku-5-5"
+    assert s.anthropic_compare_model == "claude-sonnet-5-5"
+
+
+@pytest.mark.parametrize(
+    ("name", "attr"),
+    [
+        ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+        ("TELEGRAM_BOT_TOKEN", "telegram_bot_token"),
+        ("TELEGRAM_CHAT_ID", "telegram_chat_id"),
+    ],
+)
+def test_secrets_are_stripped(monkeypatch: pytest.MonkeyPatch, name: str, attr: str) -> None:
+    monkeypatch.setenv(name, "  value-123\r\n")
+
+    secret = getattr(make(), attr)
+
+    assert secret.get_secret_value() == "value-123"
+
+
+def test_a_secret_passed_as_secretstr_is_left_alone() -> None:
+    s = Settings(_env_file=None, ANTHROPIC_API_KEY=SecretStr("abc"))  # type: ignore[call-arg]
+
+    assert s.anthropic_api_key is not None
+    assert s.anthropic_api_key.get_secret_value() == "abc"
