@@ -268,17 +268,17 @@ class TestUpgradeToV4:
         assert "runs" not in table_names(path)
 
         with contextlib.closing(connect(path)) as conn:
-            assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == storage.SCHEMA_VERSION
             assert conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
             save_run(conn, record())
 
         assert "runs" in table_names(path)
 
-    def test_v2_database_is_upgraded_straight_to_v4(self, path: Path) -> None:
+    def test_v2_database_is_upgraded_straight_to_current(self, path: Path) -> None:
         make_v2_database(path)
 
         with contextlib.closing(connect(path)) as conn:
-            assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == storage.SCHEMA_VERSION
             assert conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
             assert list_runs(conn) == []
 
@@ -286,4 +286,4 @@ class TestUpgradeToV4:
 
     def test_min_upgradable_version_stays_2(self) -> None:
         assert storage.MIN_UPGRADABLE_VERSION == 2
-        assert storage.SCHEMA_VERSION == 4
+        assert storage.SCHEMA_VERSION == 5

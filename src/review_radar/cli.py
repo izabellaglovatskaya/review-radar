@@ -21,7 +21,7 @@ from review_radar.analysis import (
     AnalysisReport,
     analyze_pending,
 )
-from review_radar.anthropic_classifier import AnthropicClassifier
+from review_radar.anthropic_classifier import PROMPT_VERSION, AnthropicClassifier
 from review_radar.classifier import Classifier, ClassifierError
 from review_radar.config import PROJECT_ROOT, ConfigError, Mode, Settings
 from review_radar.fixture_classifier import FixtureClassifier
@@ -32,14 +32,34 @@ from review_radar.storage import (
     RunRecord,
     SaveResult,
     StorageError,
+    claim_summary,
     connect,
     count_reviews,
+    finish_summary,
     save_reviews,
     save_run,
+    summary_blocker,
+)
+from review_radar.summary import (
+    MessageTooLong,
+    Period,
+    Summary,
+    build_summary,
+    check_length,
+    render_message,
+)
+from review_radar.telegram import (
+    DeliveryState,
+    TelegramError,
+    TelegramSender,
+    quiet_http_loggers,
 )
 
 logger = logging.getLogger(__name__)
 
+DATE_FORMAT = "%Y-%m-%d"
+EXIT_NO_REVIEWS = 3
+_CHECK_CHAT = "Check the chat, then use --force to send again."
 MAX_LISTED_LINES = 10
 DEMO_PROVIDER = "fixture"
 _EARLY_STOPS = frozenset({"stopped_transient", "call_budget_exceeded"})
@@ -103,6 +123,7 @@ def _configure_logging(verbose: bool) -> None:
     handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     package_logger.addHandler(handler)
     package_logger.setLevel(logging.INFO if verbose else logging.WARNING)
+    quiet_http_loggers()
 
 
 def _format_lines(lines: list[int]) -> str:
@@ -363,6 +384,226 @@ def _echo_analysis(classifier: Classifier, report: AnalysisReport) -> None:
     usage = report.usage or Usage(input_tokens=0, output_tokens=0)
     typer.echo(f"Tokens: {usage.input_tokens} in / {usage.output_tokens} out")
     typer.echo(_cost_line(classifier, usage))
+
+
+def make_telegram_sender(*, token: SecretStr, chat_id: SecretStr) -> TelegramSender:
+    """Build the real sender. Tests replace this function to fake the HTTP transport."""
+    return TelegramSender(token=token, chat_id=chat_id)
+
+
+def _today() -> dt.date:
+    return dt.date.today()
+
+
+@app.command("summary")
+def summary_command(
+    date: Annotated[
+        dt.datetime | None,
+        typer.Option(
+            "--date", formats=[DATE_FORMAT], help="Day to summarize (default: yesterday)."
+        ),
+    ] = None,
+    start: Annotated[
+        dt.datetime | None,
+        typer.Option("--from", formats=[DATE_FORMAT], help="First day of a period (with --to)."),
+    ] = None,
+    end: Annotated[
+        dt.datetime | None,
+        typer.Option("--to", formats=[DATE_FORMAT], help="Last day of a period (with --from)."),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Print the message; send and record nothing.")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Send even if this period was already sent.")
+    ] = False,
+    allow_partial: Annotated[
+        bool,
+        typer.Option("--allow-partial", help="Send even if some reviews are not analyzed yet."),
+    ] = False,
+    allow_empty: Annotated[
+        bool,
+        typer.Option("--allow-empty", help="Treat a period with no reviews as success (exit 0)."),
+    ] = False,
+) -> None:
+    """Build the summary for a day or period and send it to Telegram (aggregates only).
+
+    Exit codes: 0 done or already sent, 1 error, 3 no reviews in the period.
+    """
+    period = _summary_period(date, start, end)
+    settings = _load_settings()
+    credentials = None if dry_run else _telegram_credentials(settings)
+    try:
+        demo = settings.resolved_mode() is not Mode.LIVE
+        if demo and credentials is not None:
+            _fail(
+                "Demo mode: these analyses are not real, so nothing was sent. "
+                "Set ANTHROPIC_API_KEY and run analyze, or use --dry-run to preview."
+            )
+        key = _analysis_key(settings)
+        with contextlib.closing(connect(settings.database_path)) as conn:
+            result = build_summary(conn, period, **key)
+            if result.total == 0:
+                _report_no_reviews(period, allow_empty)
+                return
+            if result.analyzed == 0:
+                _fail(f"No review for {period.label} is analyzed yet; run analyze first.")
+            message = render_message(result, demo=demo)
+            check_length(message)
+            if credentials is None:
+                typer.echo(message)
+                typer.echo("Dry run: nothing sent.")
+                return
+            blocker = None if force else summary_blocker(conn, period.start, period.end)
+            if blocker is not None:
+                _report_blocked(blocker, period)
+                return
+            if result.not_analyzed and not allow_partial:
+                _fail(
+                    f"{result.not_analyzed} review(s) for {period.label} are not analyzed; "
+                    "run analyze, or pass --allow-partial to send anyway."
+                )
+            _deliver(conn, result, key, message, credentials, force)
+    except (StorageError, ConfigError, ClassifierError, MessageTooLong) as exc:
+        _fail(exc)
+
+
+def _report_no_reviews(period: Period, allow_empty: bool) -> None:
+    """An empty period may mean a missed ingest, so it is not a success unless allowed."""
+    if allow_empty:
+        typer.echo(f"No reviews for {period.label}; nothing sent.")
+        return
+    typer.echo(
+        f"No reviews for {period.label}; nothing sent. Check that ingest ran, "
+        "or pass --allow-empty if an empty period is expected.",
+        err=True,
+    )
+    raise typer.Exit(EXIT_NO_REVIEWS)
+
+
+def _report_blocked(status: str, period: Period) -> None:
+    """Already sent is a normal outcome; an unconfirmed send needs a person to check."""
+    if status == "sent":
+        typer.echo(f"Already sent for {period.label}; nothing sent. Use --force to send again.")
+        return
+    _fail(
+        f"An earlier send for {period.label} has no confirmed result and may have been "
+        f"delivered. {_CHECK_CHAT}"
+    )
+
+
+def _summary_period(
+    date: dt.datetime | None, start: dt.datetime | None, end: dt.datetime | None
+) -> Period:
+    if date is not None and (start is not None or end is not None):
+        raise typer.BadParameter("Use either --date or --from/--to, not both.")
+    if (start is None) != (end is None):
+        raise typer.BadParameter("--from and --to must be used together.")
+    if date is not None:
+        return Period.day(date.date())
+    if start is None or end is None:
+        return Period.day(_today() - dt.timedelta(days=1))
+    if start > end:
+        raise typer.BadParameter("--from must not be after --to.")
+    return Period(start.date(), end.date())
+
+
+def _telegram_credentials(settings: Settings) -> tuple[SecretStr, SecretStr]:
+    """Return token and chat id, or fail naming only the missing variables."""
+    token, chat_id = settings.telegram_bot_token, settings.telegram_chat_id
+    if token is None or chat_id is None:
+        missing = [
+            name
+            for name, value in (("TELEGRAM_BOT_TOKEN", token), ("TELEGRAM_CHAT_ID", chat_id))
+            if value is None
+        ]
+        _fail(f"{' and '.join(missing)} not set; nothing sent. Use --dry-run to preview.")
+    return token, chat_id
+
+
+def _analysis_key(settings: Settings) -> dict[str, str]:
+    """The classifier key `analyze` stores results under in the current mode."""
+    if settings.resolved_mode() is Mode.LIVE:
+        return {
+            "provider": AnthropicClassifier.provider,
+            "model": settings.anthropic_model,
+            "prompt_version": PROMPT_VERSION,
+        }
+    fixture = FixtureClassifier.from_file(DEMO_FIXTURES)
+    return {
+        "provider": fixture.provider,
+        "model": fixture.model,
+        "prompt_version": fixture.prompt_version,
+    }
+
+
+def _deliver(
+    conn: sqlite3.Connection,
+    result: Summary,
+    key: dict[str, str],
+    message: str,
+    credentials: tuple[SecretStr, SecretStr],
+    force: bool,
+) -> None:
+    """Claim the period, send once and record the outcome. Any failure exits non-zero."""
+    label = result.period.label
+    claim = claim_summary(
+        conn,
+        result.period.start,
+        result.period.end,
+        **key,
+        reviews_total=result.total,
+        force=force,
+    )
+    if claim.blocked_by is not None:  # another run claimed it after the first check
+        _report_blocked(claim.blocked_by, result.period)
+        return
+    token, chat_id = credentials
+    try:
+        message_id = make_telegram_sender(token=token, chat_id=chat_id).send(message)
+    except TelegramError as exc:
+        recorded = _record_send_failure(
+            conn, claim.summary_id, exc.state.value, exc.reason, exc.status_code
+        )
+        if exc.state is DeliveryState.UNKNOWN:
+            _fail(f"{exc} The summary may have been delivered. {_CHECK_CHAT}")
+        if not recorded:
+            _fail(f"{exc} It was not delivered, but the attempt stays open: use --force to retry.")
+        _fail(f"{exc} Nothing was delivered; run the command again to retry.")
+    except KeyboardInterrupt:
+        _record_send_failure(conn, claim.summary_id, "unknown", "interrupted")
+        typer.echo(f"Interrupted. The summary may have been delivered. {_CHECK_CHAT}", err=True)
+        raise typer.Exit(130) from None
+    except Exception as exc:  # noqa: BLE001 (name its type only: its text could quote the URL)
+        _record_send_failure(conn, claim.summary_id, "unknown", "unexpected_error")
+        _fail(
+            f"Telegram send failed ({type(exc).__name__}). "
+            f"The summary may have been delivered. {_CHECK_CHAT}"
+        )
+    try:
+        finish_summary(conn, claim.summary_id, "sent", message_id=message_id)
+    except StorageError as exc:
+        _fail(
+            f"The summary was sent, but recording it failed: {exc} "
+            "A later run will not resend it without --force."
+        )
+    typer.echo(f"Sent the summary for {label}.")
+
+
+def _record_send_failure(
+    conn: sqlite3.Connection,
+    summary_id: int | None,
+    status: str,
+    reason: str,
+    status_code: int | None = None,
+) -> bool:
+    """Record a failed send; on a storage error print it and return False (the row stays open)."""
+    try:
+        finish_summary(conn, summary_id, status, reason=reason, status_code=status_code)
+    except StorageError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        return False
+    return True
 
 
 def _load_settings() -> Settings:

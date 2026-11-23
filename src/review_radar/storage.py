@@ -23,8 +23,9 @@ modified.
 
 Schema versions: 1 (stage 3) keyed reviews by external id alone; 2 scopes the id by source;
 3 adds the `analyses` cache table; 4 adds the `runs` table (one row per analyze run, with token
-usage and estimated cost). A version 1 database cannot be upgraded in place and must be
-recreated from the CSV; versions 2 and 3 are upgraded.
+usage and estimated cost); 5 adds the `summaries` table (one row per Telegram send attempt). A
+version 1 database cannot be upgraded in place and must be recreated from the CSV; versions 2
+to 4 are upgraded.
 """
 
 import datetime as dt
@@ -41,7 +42,7 @@ from review_radar.models import Analysis, Review, dedup_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 MIN_UPGRADABLE_VERSION = 2
 APPLICATION_ID = 0x52765264  # ASCII "RvRd"
 
@@ -96,8 +97,25 @@ CREATE TABLE IF NOT EXISTS runs (
     failures TEXT NOT NULL,
     api_calls INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS summaries (
+    id INTEGER PRIMARY KEY,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('sending', 'sent', 'failed', 'unknown')),
+    forced INTEGER NOT NULL CHECK (forced IN (0, 1)),
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    reviews_total INTEGER NOT NULL,
+    reason TEXT,
+    status_code INTEGER,
+    message_id INTEGER,
+    started_at TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_summaries_period ON summaries (period_start, period_end);
 PRAGMA application_id = 1383486052;
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 COMMIT;
 """
 
@@ -161,6 +179,43 @@ SELECT started_at, finished_at, provider, model, prompt_version, reviews_total, 
 FROM runs ORDER BY id
 """
 
+_SELECT_PERIOD_ANALYSES = """
+SELECT a.sentiment, a.topics
+FROM reviews r
+LEFT JOIN analyses a
+    ON a.text_hash = r.text_hash AND a.provider = ? AND a.model = ? AND a.prompt_version = ?
+WHERE r.review_date BETWEEN ? AND ?
+ORDER BY r.id
+"""
+
+_SELECT_SUMMARY_BLOCKER = """
+SELECT status FROM summaries
+WHERE period_start = ? AND period_end = ? AND status IN ('sending', 'sent', 'unknown')
+ORDER BY CASE status WHEN 'sent' THEN 0 ELSE 1 END, id
+LIMIT 1
+"""
+
+_INSERT_SUMMARY = """
+INSERT INTO summaries
+    (period_start, period_end, status, forced, provider, model, prompt_version, reviews_total,
+     started_at)
+VALUES (?, ?, 'sending', ?, ?, ?, ?, ?, ?)
+"""
+
+_FINISH_SUMMARY = """
+UPDATE summaries
+SET status = ?, reason = ?, status_code = ?, message_id = ?, finished_at = ?
+WHERE id = ? AND status = 'sending'
+"""
+
+_SELECT_SUMMARIES = """
+SELECT period_start, period_end, status, forced, provider, model, prompt_version, reviews_total,
+       reason, status_code, message_id, started_at, finished_at
+FROM summaries ORDER BY id
+"""
+
+_FINAL_SUMMARY_STATUSES = frozenset({"sent", "failed", "unknown"})
+
 
 class StorageError(Exception):
     """The database cannot be opened, validated or written. Never carries review text."""
@@ -214,6 +269,33 @@ class RunRecord:
     outcome: str = "completed"
     failures: Mapping[str, int] = field(default_factory=dict)
     api_calls: int = 0
+
+
+@dataclass(frozen=True)
+class SummaryClaim:
+    """The right to send one summary: a row id, or the status that blocks the send."""
+
+    summary_id: int | None
+    blocked_by: str | None
+
+
+@dataclass(frozen=True)
+class SummaryRecord:
+    """One Telegram send attempt (aggregates are not stored, only the outcome)."""
+
+    period_start: dt.date
+    period_end: dt.date
+    status: str
+    forced: bool
+    provider: str
+    model: str
+    prompt_version: str
+    reviews_total: int
+    reason: str | None
+    status_code: int | None
+    message_id: int | None
+    started_at: dt.datetime
+    finished_at: dt.datetime | None
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -497,6 +579,145 @@ def list_runs(conn: sqlite3.Connection) -> list[RunRecord]:
         ]
     except (ValueError, TypeError, InvalidOperation):
         raise _unreadable("runs") from None
+
+
+def load_period_analyses(
+    conn: sqlite3.Connection,
+    start: dt.date,
+    end: dt.date,
+    *,
+    provider: str,
+    model: str,
+    prompt_version: str,
+) -> list[Analysis | None]:
+    """Return one entry per review dated in `[start, end]`; None when it has no analysis.
+
+    Review text is deliberately not selected.
+    """
+    params = (provider, model, prompt_version, start.isoformat(), end.isoformat())
+    try:
+        rows = conn.execute(_SELECT_PERIOD_ANALYSES, params).fetchall()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read analyses: {_reason(exc)}.") from None
+    try:
+        return [
+            None
+            if sentiment is None
+            else Analysis(sentiment=sentiment, topics=json.loads(topics), confidence=None)
+            for sentiment, topics in rows
+        ]
+    except (ValueError, TypeError):  # includes pydantic.ValidationError
+        raise _unreadable("analyses") from None
+
+
+def summary_blocker(conn: sqlite3.Connection, start: dt.date, end: dt.date) -> str | None:
+    """Return the status that blocks a plain send for this exact period, or None."""
+    try:
+        row = conn.execute(_SELECT_SUMMARY_BLOCKER, (start.isoformat(), end.isoformat())).fetchone()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read summaries: {_reason(exc)}.") from None
+    return None if row is None else str(row[0])
+
+
+def claim_summary(
+    conn: sqlite3.Connection,
+    start: dt.date,
+    end: dt.date,
+    *,
+    provider: str,
+    model: str,
+    prompt_version: str,
+    reviews_total: int,
+    force: bool,
+    now: dt.datetime | None = None,
+) -> SummaryClaim:
+    """Record the intent to send before sending, so a crash can never lead to a silent resend.
+
+    Blocked when the period was sent, is being sent, or ended with an unknown delivery, unless
+    `force` is set. A failed attempt does not block. Raises ValueError for a naive `now`.
+    """
+    stamp = utc_stamp(now)
+    period = (start.isoformat(), end.isoformat())
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if not force:
+                blocker = conn.execute(_SELECT_SUMMARY_BLOCKER, period).fetchone()
+                if blocker is not None:
+                    return SummaryClaim(summary_id=None, blocked_by=str(blocker[0]))
+            cursor = conn.execute(
+                _INSERT_SUMMARY,
+                (*period, int(force), provider, model, prompt_version, reviews_total, stamp),
+            )
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot record the summary: {_reason(exc)}.") from None
+    return SummaryClaim(summary_id=int(cursor.lastrowid or 0), blocked_by=None)
+
+
+def finish_summary(
+    conn: sqlite3.Connection,
+    summary_id: int | None,
+    status: str,
+    *,
+    reason: str | None = None,
+    status_code: int | None = None,
+    message_id: int | None = None,
+    now: dt.datetime | None = None,
+) -> None:
+    """Move a claimed row from `sending` to its final status (exactly once)."""
+    if status not in _FINAL_SUMMARY_STATUSES:
+        raise StorageError("Cannot record the summary: invalid status.")
+    params = (status, reason, status_code, message_id, utc_stamp(now), summary_id)
+    try:
+        with conn:
+            updated = conn.execute(_FINISH_SUMMARY, params).rowcount
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot record the summary: {_reason(exc)}.") from None
+    if updated != 1:
+        raise StorageError("Cannot record the summary: no open send attempt.")
+
+
+def list_summaries(conn: sqlite3.Connection) -> list[SummaryRecord]:
+    """Return all recorded send attempts, oldest first."""
+    try:
+        rows = conn.execute(_SELECT_SUMMARIES).fetchall()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read summaries: {_reason(exc)}.") from None
+    try:
+        return [
+            SummaryRecord(
+                period_start=dt.date.fromisoformat(start),
+                period_end=dt.date.fromisoformat(end),
+                status=status,
+                forced=bool(forced),
+                provider=provider,
+                model=model,
+                prompt_version=prompt_version,
+                reviews_total=total,
+                reason=reason,
+                status_code=status_code,
+                message_id=message_id,
+                started_at=dt.datetime.fromisoformat(started),
+                finished_at=None if finished is None else dt.datetime.fromisoformat(finished),
+            )
+            for (
+                start,
+                end,
+                status,
+                forced,
+                provider,
+                model,
+                prompt_version,
+                total,
+                reason,
+                status_code,
+                message_id,
+                started,
+                finished,
+            ) in rows
+        ]
+    except (ValueError, TypeError):
+        raise _unreadable("summaries") from None
 
 
 def _failures(raw: str) -> dict[str, int]:
