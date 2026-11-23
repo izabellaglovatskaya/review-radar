@@ -26,14 +26,15 @@ Use the **tdd-guide** agent and follow red → green → refactor: write a faili
 
 Project agents live in `.claude/agents/` (copied from
 [everything-claude-code](https://github.com/affaan-m/everything-claude-code), MIT license alongside).
-`tdd-guide`, `code-reviewer`, `security-reviewer` and `planner` come from the global Claude Code setup.
+`tdd-guide`, `code-reviewer` and `security-reviewer` were copied at commit `4adeee6`; `security-reviewer` adds the
+`.env` rule below. `planner` is not part of the project and is used only if the global Claude Code setup has it.
 
 | Agent | When |
 |---|---|
 | `tdd-guide` | While writing any code (tests first). |
 | `code-reviewer` | After every stage. |
 | `python-reviewer` | After every stage that changes Python code. |
-| `security-reviewer` | After stages touching input parsing, the database, Telegram, the LLM client, secrets or CI. |
+| `security-reviewer` | After stages touching input parsing, the database, Telegram, the LLM client, secrets or CI. Never reads `.env` (rule 8). |
 | `silent-failure-hunter` | After stages with the model, cache, retries or Telegram sending (stages 4, 5, 6, 8). |
 | `commit-reviewer` | Before every commit (checks the message and whether the diff should be split). |
 | `fastapi-reviewer` | Not used here (no FastAPI in this project); kept as a template for future projects. |
@@ -61,3 +62,17 @@ Tests and agents use a temporary `DATABASE_PATH`, never `data/review_radar.db`.
 
 Reviews, company names, chat IDs (e.g. `123456789`), tokens and screenshots are fictional. Real values exist only in
 `.env` and the local database, both git-ignored.
+
+### 8. No agent or search reads `.env`
+
+No agent, tool or command opens or searches `.env` or `.env.*` (`.env.example` is the only exception). The application
+loads it through `Settings`; nothing else touches it. Every recursive search for secrets excludes `.env`, `.env.*`
+(except `.env.example`), `data/` and `.venv/`. Use this form, and search `.env.example` separately:
+
+```bash
+git grep --untracked -nIE '<pattern>' -- . ':(exclude,glob)**/.env' ':(exclude,glob)**/.env.*' \
+  ':(exclude,glob)data/**' ':(exclude,glob).venv/**'
+git grep -nIE '<pattern>' -- .env.example
+```
+
+Never use `grep -r` or an unfiltered `rg` for this. If a file was read by mistake, stop and tell the owner.
