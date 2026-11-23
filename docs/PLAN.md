@@ -73,6 +73,8 @@ Two runs on a temporary database: `analyze --limit 20 --max-calls 5`, then `anal
 | Remaining reviews | 258 | 277 | 23 | 13 | 34,766 | 9,243 | $0.008098 |
 | Total | 278 | 300 | | 14 | 37,410 | 9,964 | $0.008723 |
 
+"Reviews covered" counts the reviews that got a new analysis in that run, including reviews sharing a sent text. "From cache" counts the reviews already analyzed before that run, so the second run saw all 300 reviews: 277 new and 23 from cache.
+
 There were no retries, batch splits or failures: 14 calls for 14 batches, both runs ended as `completed`.
 
 Accuracy against `data/sample/ground_truth.json`, over all 300 reviews:
