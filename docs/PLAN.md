@@ -52,15 +52,41 @@ Total: 29–37 h, 33–43 h with review rounds.
 
 ## Cost estimate (live mode)
 
-About 130 input and 31 output tokens per review with batches of 20 (an estimate; the actual numbers will come from the `runs` table after the first live run, `analyze --limit 20`, and replace this section).
-One run over 300 reviews: about 39k input and 9.3k output tokens.
+Measured on the first live run (2026-11-23, `claude-haiku-5-5`, prompt `anthropic-1+9998e992`, sample CSV of 300 reviews, 278 unique texts, batches of 20): about 135 input and 36 output tokens per unique text. The earlier estimate was 130 and 31.
 
 | Model | $ per 1M tokens (in / out) | 300 reviews |
 |---|---|---|
-| Claude Haiku 5.5 | 0.10 / 0.50 | ≈ $0.01 |
-| Claude Sonnet 5.5 | 2.00 / 10.00 | ≈ $0.17 |
+| Claude Haiku 5.5 | 0.10 / 0.50 | $0.0087 (measured) |
+| Claude Sonnet 5.5 | 2.00 / 10.00 | ≈ $0.17 (projected from the Haiku token counts, not run) |
+
+Costs are computed from the API-reported tokens and the price table in `pricing.py`; they were not reconciled with the Anthropic invoice.
 
 Reruns on the same data cost nothing (cache). Demo mode costs nothing.
+
+## First live run (2026-11-23)
+
+Two runs on a temporary database: `analyze --limit 20 --max-calls 5`, then `analyze --max-calls 25`.
+
+| Run | Texts sent | Reviews covered | From cache | API calls | Input tokens | Output tokens | Cost |
+|---|---|---|---|---|---|---|---|
+| `--limit 20` | 20 | 23 | 0 | 1 | 2,644 | 721 | $0.000625 |
+| Remaining reviews | 258 | 277 | 23 | 13 | 34,766 | 9,243 | $0.008098 |
+| Total | 278 | 300 | | 14 | 37,410 | 9,964 | $0.008723 |
+
+There were no retries, batch splits or failures: 14 calls for 14 batches, both runs ended as `completed`.
+
+Accuracy against `data/sample/ground_truth.json`, over all 300 reviews:
+
+| Metric | Result |
+|---|---|
+| Sentiment | 297 / 300 (99.0%) |
+| Exact topic set | 279 / 300 (93.0%) |
+| Sentiment and exact topic set | 276 / 300 (92.0%) |
+| Topic labels | precision 93.5%, recall 95.2% (200 matched, 14 extra, 10 missed) |
+
+The three sentiment errors are neutral reviews (`r0255`, `r0257`, `r0274`). Most topic differences are an added or dropped second topic; `other` was never predicted (2 expected, both labelled `product_quality`).
+
+**Caveat: the data is synthetic.** The reviews come from a small set of templates, so errors repeat across similar texts and these numbers do not predict accuracy on real reviews. The ground truth is template-based too: some counted "errors" are defensible readings (for example, a complaint about a damaged item labelled only `customer_support`, where the model also adds `product_quality`).
 
 ## Review backlog (LOW findings)
 
@@ -162,3 +188,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `anthropic_classifier.py`: `x-should-retry: true` on 400/401/403/404 is retried and reported as `server_error`; keep the client-error reason or let the header override only non-fatal statuses [any].
 - `cli.py`: the "Could not record the run" WARNING is printed before the report; drop it or log at DEBUG [any].
 - `cli.py`: Ctrl+C outside the batch loop (connect, counts, run save) exits 1 ("Aborted!") without a run row; catch it in `analyze()` and exit 130 [8].
+
+### First live run
+
+- Eval: add a small fictional set of "hard" reviews with ground truth (sarcasm, mixed feelings, typos, very short texts) and report it separately in the Haiku vs Sonnet comparison, because the template-based sample is too easy to separate the models [8].
