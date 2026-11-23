@@ -207,6 +207,10 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `storage.py`: `int(cursor.lastrowid or 0)` hides a missing row id; raise `StorageError` [any].
 - `storage.py`: a corrupt stored topic is shown as `Other` with only a warning; validate strictly when loading for a summary [any].
 - Tests: no test runs the real `httpx2` transport over a mock network backend with logging at DEBUG [any].
+- `cli.py`: Ctrl+C after a successful send, or during recording of a result, leaves the row `sending` (no resend), exits 1 and does not say the message was delivered; handle it and exit 130 [8].
+- `cli.py`: a second Ctrl+C while an interrupted send is being recorded prints a traceback (no secrets, locals are off); the row stays `sending` [any].
+- `cli.py`: Ctrl+C is always recorded as `unknown`, even if it arrived before the request left (safe but imprecise) [any].
+- `cli.py`: a failure while building the sender would be recorded as `unknown`; build it before the `try` and record `failed` (not reachable today) [any].
 - Carried over from earlier stages: locked database handling and `busy_timeout`, and `load_analyses` still has no production caller [8].
 
 ### First live run
