@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated, Literal, NoReturn
 
 import typer
+from jinja2 import TemplateError
 from pydantic import SecretStr, ValidationError
 
 from review_radar import __version__
@@ -24,6 +25,13 @@ from review_radar.analysis import (
 from review_radar.anthropic_classifier import PROMPT_VERSION, AnthropicClassifier
 from review_radar.classifier import Classifier, ClassifierError
 from review_radar.config import PROJECT_ROOT, ConfigError, Mode, Settings
+from review_radar.dashboard import (
+    SITE_DIR,
+    DashboardError,
+    build_dashboard_data,
+    render_dashboard,
+    write_dashboard,
+)
 from review_radar.fixture_classifier import FixtureClassifier
 from review_radar.ingest import IngestError, IngestResult, read_reviews
 from review_radar.models import Usage
@@ -384,6 +392,38 @@ def _echo_analysis(classifier: Classifier, report: AnalysisReport) -> None:
     usage = report.usage or Usage(input_tokens=0, output_tokens=0)
     typer.echo(f"Tokens: {usage.input_tokens} in / {usage.output_tokens} out")
     typer.echo(_cost_line(classifier, usage))
+
+
+@app.command("dashboard")
+def dashboard_command(
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Output folder (default: site/ in the repository)."),
+    ] = None,
+) -> None:
+    """Build the static dashboard page from stored analyses (aggregates only, no network).
+
+    Exit codes: 0 written, 1 error, 3 no reviews in the database.
+    """
+    settings = _load_settings()
+    try:
+        demo = settings.resolved_mode() is not Mode.LIVE
+        key = _analysis_key(settings)
+        with contextlib.closing(connect(settings.database_path)) as conn:
+            if count_reviews(conn) == 0:
+                typer.echo("No reviews in the database; run ingest first.", err=True)
+                raise typer.Exit(EXIT_NO_REVIEWS)
+            data = build_dashboard_data(conn, **key, demo=demo, today=_today())
+        page = write_dashboard(render_dashboard(data), out if out is not None else SITE_DIR)
+    except (StorageError, ConfigError, ClassifierError, DashboardError) as exc:
+        _fail(exc)
+    except TemplateError:  # its text can quote template values, so it is not shown
+        _fail("Cannot render the dashboard template.")
+    if data.not_analyzed:
+        typer.echo(
+            f"Warning: {data.not_analyzed} review(s) are not analyzed; run analyze.", err=True
+        )
+    typer.echo(f"Dashboard written: {page}")
 
 
 def make_telegram_sender(*, token: SecretStr, chat_id: SecretStr) -> TelegramSender:

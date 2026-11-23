@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Radar dashboard</title>
+<meta name="description" content="Customer review sentiment over time, sentiment shares and top complaint topics.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/dashboard.css">
+<script src="{{ chart_js }}" defer></script>
+<script src="assets/dashboard.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="page-header">
+<h1>Review Radar dashboard</h1>
+<p>Generated on {{ data.generated_on }}. Only aggregate numbers are shown.</p>
+</header>
+<main id="content">
+{% if data.demo %}
+<p class="notice"><strong>Demo data.</strong> These numbers come from canned analyses, not a live model.</p>
+{% endif %}
+{% if data.not_analyzed %}
+<p class="notice"><strong>{{ data.not_analyzed }} reviews are not analyzed.</strong> Shares and topics cover the {{ data.analyzed }} analyzed reviews.</p>
+{% endif %}
+<noscript><p class="notice">Charts need JavaScript. Every number is in the tables below.</p></noscript>
+<p id="chart-error" class="notice" role="status" hidden>The charts could not be drawn. Every number is in the tables below.</p>
+<section aria-labelledby="overview-title">
+<h2 id="overview-title">Overview</h2>
+<dl class="stats">
+<div><dt>Reviews</dt><dd>{{ data.total }}</dd></div>
+<div><dt>Positive</dt><dd>{{ data.positive }} ({{ data.shares[0] }}%)</dd></div>
+<div><dt>Neutral</dt><dd>{{ data.neutral }} ({{ data.shares[1] }}%)</dd></div>
+<div><dt>Negative</dt><dd>{{ data.negative }} ({{ data.shares[2] }}%)</dd></div>
+</dl>
+</section>
+<section aria-labelledby="daily-title">
+<h2 id="daily-title">Sentiment by day</h2>
+<figure>
+<figcaption>Number of positive, neutral and negative reviews per day. Each line has its own marker and dash pattern.</figcaption>
+<div class="chart" hidden><canvas id="chart-daily" role="img" aria-label="{{ daily_label(data) }}"></canvas></div>
+<div class="table-scroll" role="region" aria-label="Sentiment by day, table" tabindex="0">
+<table>
+<caption>Reviews per day by sentiment</caption>
+<thead><tr><th scope="col">Date</th><th scope="col">Positive</th><th scope="col">Neutral</th><th scope="col">Negative</th><th scope="col">Not analyzed</th></tr></thead>
+<tbody>
+{% for day in data.days %}
+<tr><th scope="row" class="nowrap">{{ day.label }}</th><td>{{ day.positive }}</td><td>{{ day.neutral }}</td><td>{{ day.negative }}</td><td>{{ day.not_analyzed }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</figure>
+</section>
+<section aria-labelledby="shares-title">
+<h2 id="shares-title">Sentiment shares</h2>
+<figure>
+<figcaption>Share of each sentiment among analyzed reviews. Bars are labelled by name.</figcaption>
+<div class="chart chart-short" hidden><canvas id="chart-shares" role="img" aria-label="{{ shares_label(data) }}"></canvas></div>
+<div class="table-scroll" role="region" aria-label="Sentiment shares, table" tabindex="0">
+<table>
+<caption>Sentiment counts and shares</caption>
+<thead><tr><th scope="col">Sentiment</th><th scope="col">Reviews</th><th scope="col">Share</th></tr></thead>
+<tbody>
+<tr><th scope="row">Positive</th><td>{{ data.positive }}</td><td>{{ data.shares[0] }}%</td></tr>
+<tr><th scope="row">Neutral</th><td>{{ data.neutral }}</td><td>{{ data.shares[1] }}%</td></tr>
+<tr><th scope="row">Negative</th><td>{{ data.negative }}</td><td>{{ data.shares[2] }}%</td></tr>
+</tbody>
+</table>
+</div>
+</figure>
+</section>
+<section aria-labelledby="topics-title">
+<h2 id="topics-title">Top complaint topics</h2>
+<figure>
+<figcaption>Topics mentioned in negative reviews, most frequent first. A review can mention several topics.</figcaption>
+<div class="chart" hidden><canvas id="chart-topics" role="img" aria-label="{{ topics_label(data) }}"></canvas></div>
+<div class="table-scroll" role="region" aria-label="Top complaint topics, table" tabindex="0">
+<table>
+<caption>Complaint topics in negative reviews</caption>
+<thead><tr><th scope="col">Topic</th><th scope="col">Negative reviews</th><th scope="col">Share of negative</th></tr></thead>
+<tbody>
+{% for topic in data.topics %}
+<tr><th scope="row">{{ topic.label }}</th><td>{{ topic.count }}</td><td>{{ topic.share }}%</td></tr>
+{% else %}
+<tr><td colspan="3">No complaint topics</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</figure>
+</section>
+</main>
+<script id="dashboard-data" type="application/json">{{ chart_payload(data)|tojson }}</script>
+</body>
+</html>

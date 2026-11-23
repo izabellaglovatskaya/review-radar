@@ -188,6 +188,14 @@ WHERE r.review_date BETWEEN ? AND ?
 ORDER BY r.id
 """
 
+_SELECT_DAILY_ANALYSES = """
+SELECT r.review_date, a.sentiment, a.topics
+FROM reviews r
+LEFT JOIN analyses a
+    ON a.text_hash = r.text_hash AND a.provider = ? AND a.model = ? AND a.prompt_version = ?
+ORDER BY r.review_date, r.id
+"""
+
 _SELECT_SUMMARY_BLOCKER = """
 SELECT status FROM summaries
 WHERE period_start = ? AND period_end = ? AND status IN ('sending', 'sent', 'unknown')
@@ -605,6 +613,31 @@ def load_period_analyses(
             if sentiment is None
             else Analysis(sentiment=sentiment, topics=json.loads(topics), confidence=None)
             for sentiment, topics in rows
+        ]
+    except (ValueError, TypeError):  # includes pydantic.ValidationError
+        raise _unreadable("analyses") from None
+
+
+def load_daily_analyses(
+    conn: sqlite3.Connection, *, provider: str, model: str, prompt_version: str
+) -> list[tuple[dt.date, Analysis | None]]:
+    """Return every review's date and analysis (None if it has none), by date, then id.
+
+    Review content is deliberately not selected.
+    """
+    try:
+        rows = conn.execute(_SELECT_DAILY_ANALYSES, (provider, model, prompt_version)).fetchall()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read analyses: {_reason(exc)}.") from None
+    try:
+        return [
+            (
+                dt.date.fromisoformat(day),
+                None
+                if sentiment is None
+                else Analysis(sentiment=sentiment, topics=json.loads(topics), confidence=None),
+            )
+            for day, sentiment, topics in rows
         ]
     except (ValueError, TypeError):  # includes pydantic.ValidationError
         raise _unreadable("analyses") from None
