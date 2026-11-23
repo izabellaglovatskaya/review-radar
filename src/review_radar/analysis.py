@@ -38,7 +38,7 @@ import datetime as dt
 import logging
 import sqlite3
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -187,11 +187,13 @@ def analyze_pending(
     limit: int | None = None,
     max_calls: int | Literal["auto"] | None = None,
     now: dt.datetime | None = None,
+    text_hashes: Collection[str] | None = None,
 ) -> AnalysisReport:
     """Classify every text without an analysis for this classifier and store the results.
 
     `max_calls` is a budget of API calls (`"auto"` is `default_max_calls(batches)`); it applies
-    only to classifiers with `set_call_budget`, others ignore it.
+    only to classifiers with `set_call_budget`, others ignore it. `text_hashes` restricts the
+    run to those texts; the other pending texts count as `not_analyzed_limit`.
 
     Raises ValueError for a bad `batch_size`, `limit` or `max_calls` or a naive `now`;
     `AnalysisAborted` when an exception other than `ClassifierError` interrupts the run, and
@@ -214,8 +216,11 @@ def analyze_pending(
     cached = count_analyzed_reviews(conn, **key)
     pending = pending_texts(conn, **key)
     deferred = 0
+    if text_hashes is not None:
+        deferred = _review_count([p for p in pending if p.text_hash not in text_hashes])
+        pending = [p for p in pending if p.text_hash in text_hashes]
     if limit is not None:
-        deferred = _review_count(pending[limit:])
+        deferred += _review_count(pending[limit:])
         pending = pending[:limit]
     batches = [pending[i : i + batch_size] for i in range(0, len(pending), batch_size)]
     ending = _Ending(max_calls=_set_budget(classifier, max_calls, len(batches)))

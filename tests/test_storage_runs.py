@@ -286,4 +286,4 @@ class TestUpgradeToV4:
 
     def test_min_upgradable_version_stays_2(self) -> None:
         assert storage.MIN_UPGRADABLE_VERSION == 2
-        assert storage.SCHEMA_VERSION == 5
+        assert storage.SCHEMA_VERSION == 6

@@ -25,7 +25,8 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Cost | Estimated per run as `input_tokens x price_in / 1M + output_tokens x price_out / 1M` (`Decimal`) from the price table in `pricing.py` (USD per 1M tokens, prompts up to 100K tokens; every batch is far below). Usage of every call is counted, including calls whose answer was invalid or whose result could not be saved. A model without a price shows `unknown`; demo costs `$0`. Two guards bound a runaway run: a circuit breaker (two batches in a row that failed only transiently stop the run, the rest is `skipped_after_transient`) and a call budget (`--max-calls N`, default for live `3 x batches + 10`, computed after `--limit`; every attempt counts; when used up the remaining reviews fail as `call_budget_exceeded`). Every `analyze` run, also a fatal, aborted or interrupted one (Ctrl+C, exit 130), writes one row to the `runs` table (schema version 4: times, provider, model, prompt version, review counts, not-analyzed-by-limit, tokens, API calls, cost, `outcome` = completed / fatal / aborted / interrupted / stopped_transient / call_budget_exceeded, failure counts by reason as JSON, fatal reason). `analyze --limit N` classifies only the first N pending texts, for a small first live run. |
 | Telegram | Send only (no commands), through `httpx2` (already locked via the Anthropic SDK), as HTML with link previews off. `review-radar summary` takes `--date` (default: yesterday, local date) or `--from`/`--to`. The message holds only aggregates and names from the closed topic list, never review text; shares cover analyzed reviews, top 3 complaint topics come from negative reviews. `--dry-run` prints the message and needs no credentials. A real send without token or chat id is an error. Demo analyses are never sent: in demo mode a real send is refused and a dry run is labelled `[DEMO]`. Unanalyzed reviews block a send unless `--allow-partial`. A period with no reviews sends nothing and exits 3 (it may mean a missed ingest) unless `--allow-empty`. Idempotent per exact period unless `--force`: schema version 5 adds a `summaries` table (one row per attempt, with the classifier key), and the row is written as `sending` before the request. A send is never retried. A certain failure is `failed` (a rerun may send); a timeout, broken exchange, 5xx, unreadable success or Ctrl+C is `unknown` and blocks until a person checks the chat and uses `--force`. Failures exit non-zero. The token is in the request URL, so HTTP loggers are held at WARNING and errors carry only reason and status codes. |
 | Dashboard | `review-radar dashboard [--out DIR]` builds `site/index.html` from a Jinja2 template (autoescape, strict undefined) with a vendored Chart.js 4.5.1; it opens from disk, makes no network request and works in demo mode without a key. The page holds aggregates only, never review text: sentiment by day (quiet days are zero, range capped at 3660 days), sentiment shares and complaint topics from negative reviews. Data is embedded with `tojson` in an `application/json` block. A CSP meta tag allows only same-origin scripts, styles and images, with no inline code. Each chart has a caption, a text label and a real table; lines differ by marker and dash, bars by name. Demo data and unanalyzed reviews are stated on the page. No reviews exits 3, none analyzed exits 1, and a failed build keeps the previous page. Assets live in `site/assets`, so the command works only from a repository checkout (accepted, like `fixtures/`). Browser tests are opt-in: `uv run --with playwright pytest -m browser`. Audit on demo data (Lighthouse 12, axe-core 4.11): Accessibility 100, Best Practices 100, Performance 97 mobile / 100 desktop, no axe violations for WCAG 2.2 AA and best practices in light and dark themes at 375 and 1280 px. SEO is 91 only because `connect-src 'none'` blocks the `robots.txt` check; the strict policy is kept for a local page. |
-| Eval | `review-radar eval` compares predictions with generator ground truth; `--compare` runs Haiku 5.5 and Sonnet 5.5 on the same data and prints an accuracy / tokens / cost table for the README. |
+| Eval | `review-radar eval` scores predictions against ground truth on the regular sample and a fictional hard set (`data/eval`, labelled by an AI agent before any model saw it); `--compare` runs Haiku 5.5 and Sonnet 5.5. Results are in [EVAL.md](EVAL.md). The default stays Haiku 5.5: Sonnet is 19.5 times the price and its lead is not statistically reliable on this sample. Live mode only prints an estimate unless `--yes` is given. Spend is limited by `--max-cost` across runs: schema version 6 adds a `spend_ledger` table, the worst case of each call is written before the call and replaced by the real cost after it, so a crash or timeout can overstate the total but never understate it. Eval uses its own `<stem>-eval.db`. Sonnet 5.5 rejects `thinking: disabled`, so it uses `between_tools`. No fallback model is used, so a refusal counts as an error. |
+| Run | `review-radar run --demo` runs ingest, analyze, a dry-run summary and the dashboard on the sample in its own `<stem>-demo.db`, with no key, network or Telegram send. `review-radar run CSV` runs the same steps live and stops at the first failed step. |
 | CI | GitHub Actions on Ubuntu only: `uv sync --locked`, ruff, pytest, and gitleaks over the full git history. |
 | Publishing | No GitHub Pages for now (until the repository is made public). README uses screenshots. |
 | Scheduling | The interface is `review-radar run`. Windows Task Scheduler setup is documented, not automated. |
@@ -57,7 +58,7 @@ Measured on the first live run (2026-11-23, `claude-haiku-5-5`, prompt `anthropi
 | Model | $ per 1M tokens (in / out) | 300 reviews |
 |---|---|---|
 | Claude Haiku 5.5 | 0.10 / 0.50 | $0.0087 (measured) |
-| Claude Sonnet 5.5 | 2.00 / 10.00 | ≈ $0.17 (projected from the Haiku token counts, not run) |
+| Claude Sonnet 5.5 | 2.00 / 10.00 | $0.1727 (measured in the stage 8 evaluation) |
 
 Costs are computed from the API-reported tokens and the price table in `pricing.py`; they were not reconciled with the Anthropic invoice.
 
@@ -229,6 +230,23 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `dashboard.html.j2`: the demo notice says "canned analyses" although some come from keyword rules, and the CLI does not print that the data is demo [8].
 - Tests: `tests/test_dashboard.py` calls `monkeypatch.undo()` mid-test; use `monkeypatch.context()` [any].
 
+### Stage 8
+
+- `cli.py`: `_run_steps` calls the command functions with positional arguments; a reordered option could pass `dry_run` to the wrong parameter. Use keywords [9].
+- `cli.py`: `run` continues after an ingest that skipped rows, so a live summary can be sent from incomplete data with exit 0; treat skipped rows as a failure or warn [any].
+- `cli.py`: `eval` drops skipped CSV rows without a message; the cause shows only as failed reviews [any].
+- `cli.py`: estimate-only `eval` silently ignores `--report` [any].
+- `cli.py`: the report file is written before the console output, so an unwritable path hides the results of a paid run (they stay in the eval database) [any].
+- `cli.py`: the cost per 1,000 shows `$0` when money was spent but no review was analyzed; show `n/a` [any].
+- `evaluation.py`: cache read and write tokens are not priced; no request uses caching today [any].
+- `evaluation.py`: table cells escape only pipes and line breaks; also escape backslashes and validate ids and categories in `load_truth` [any].
+- `evaluation.py`: `client: Any` and some untyped locals; use the existing protocol and annotations [9].
+- `analysis.py`: `text_hashes` accepts a list with slow lookups; take a set [any].
+- Tests: no test covers an unpriced compare model [any].
+- `docs/EVAL.md`: regenerating the report replaces the hand-written analysis; write the generated part to its own file. The per-dataset cost behind the $0.1727 figure is not shown there [10].
+- Deleting the `-eval.db` file resets the spend limit (accepted: the limit belongs to that database).
+- Items tagged [8] in earlier sections that this stage did not change stay open.
+
 ### First live run
 
-- Eval: add a small fictional set of "hard" reviews with ground truth (sarcasm, mixed feelings, typos, very short texts) and report it separately in the Haiku vs Sonnet comparison, because the template-based sample is too easy to separate the models [8].
+- ~~Eval: add a small fictional set of "hard" reviews with ground truth (sarcasm, mixed feelings, typos, very short texts) and report it separately in the Haiku vs Sonnet comparison, because the template-based sample is too easy to separate the models [8].~~ Done in stage 8.

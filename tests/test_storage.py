@@ -61,7 +61,7 @@ class TestConnect:
                 r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
             ]
 
-        assert version == SCHEMA_VERSION == 5
+        assert version == SCHEMA_VERSION == 6
         assert MIN_UPGRADABLE_VERSION == 2
         assert {"reviews", "analyses", "runs"} <= set(tables)
 
@@ -73,7 +73,7 @@ class TestConnect:
             raw.execute("PRAGMA user_version = 1")
             raw.commit()
 
-        with pytest.raises(StorageError, match=r"version 1, expected 5.*run ingest again"):
+        with pytest.raises(StorageError, match=r"version 1, expected 6.*run ingest again"):
             connect(path)
 
     def test_creates_parent_directories(self, tmp_path: Path) -> None:
@@ -97,7 +97,7 @@ class TestConnect:
         with contextlib.closing(sqlite3.connect(path)) as raw:
             raw.execute("PRAGMA user_version = 7")
 
-        with pytest.raises(StorageError, match=r"7, expected 5"):
+        with pytest.raises(StorageError, match=r"7, expected 6"):
             connect(path)
 
     def test_foreign_database_is_rejected(self, tmp_path: Path) -> None:
@@ -143,7 +143,7 @@ class TestSchemaInit:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         good = storage._SCHEMA
-        broken = good.replace("PRAGMA user_version = 5;", "SELECT * FROM no_such_table;")
+        broken = good.replace("PRAGMA user_version = 6;", "SELECT * FROM no_such_table;")
         assert broken != good
         monkeypatch.setattr(storage, "_SCHEMA", broken)
 

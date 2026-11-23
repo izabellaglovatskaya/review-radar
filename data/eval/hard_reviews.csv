@@ -1,0 +1,61 @@
+review_id,review_date,rating,text,source
+h001,2026-11-20,5,"Oh wonderful, my 'express' delivery took only three weeks. Truly a miracle of modern logistics.",app
+h002,2026-11-21,4,Love paying twice for the same lamp. Two charges on my card really make me feel like a valued customer.,web
+h003,2026-11-22,5,"Great job on the packaging, the mug set arrived as a convenient pile of ceramic shards.",app
+h004,2026-11-23,3,Fantastic support team. Eleven days of silence is a bold customer service strategy.,web
+h005,2026-11-24,5,Such a bargain: forty euros for a towel thinner than a paper napkin.,app
+h006,2026-11-20,4,The app is brilliant if your hobby is watching it crash at checkout.,web
+h007,2026-11-21,2,"Sure, take your time with my refund. It has only been two months and I enjoy waiting.",app
+h008,2026-11-22,5,"Wow, the shelf held up for nearly four hours before it snapped. Impressive engineering.",web
+h009,2026-11-23,1,"I fully expected to hate this blanket after the reviews, and annoyingly it is perfect. Guess I have to keep it.",app
+h010,2026-11-24,2,Terrible news for my wallet: everything here is so nice that I ordered again.,web
+h011,2026-11-20,4,Nice touch sending me a basket in a colour I never ordered. Keeps life exciting.,app
+h012,2026-11-21,5,Thrilled to spend my Saturday on hold with your helpline. Best forty minutes of hold music ever.,web
+h013,2026-11-22,3,Because what every small candle needs is a box the size of a microwave and a kilo of plastic.,app
+h014,2026-11-23,5,Love how the price went up the moment I put it in my cart. Very creative.,web
+h015,2026-11-24,4,Another flawless update: the website now logs me out every time I open my orders.,app
+h016,2026-11-20,3,"The duvet cover is gorgeous and soft, but it arrived nine days late.",web
+h017,2026-11-21,4,"Support sorted out my problem quickly, although the lamp itself has flickered from day one.",app
+h018,2026-11-22,2,"Beautiful carafe, fair price, but the refund for the second one is still missing after a month and nobody answers.",web
+h019,2026-11-23,4,"Slow shipping, yes, but the rug is so good that I forgave it within a minute. Would buy again.",app
+h020,2026-11-24,3,"Good quality towels. Too expensive for what they are, though.",web
+h021,2026-11-20,5,The box was dented but everything inside was fine and the planter looks lovely.,app
+h022,2026-11-21,2,The app is lovely to use. Shame the mugs chipped within a week and the handle came off one.,web
+h023,2026-11-22,3,"Delivery was early and the packaging neat. The organizer itself is just okay, a little flimsy.",app
+h024,2026-11-23,1,"Nice people on the phone, but they charged me twice and I am still out of pocket.",web
+h025,2026-11-24,4,"Not cheap, but you get what you pay for. Solid oak, sturdy, no regrets.",app
+h026,2026-11-20,3,"I like the basket, I dislike the checkout. It kept freezing until I switched browsers.",web
+h027,2026-11-21,2,"Lovely design, awful stitching. The throw started to unravel after the first wash.",app
+h028,2026-11-22,4,"The return took a while to process, but the money did come back and the staff were kind throughout.",web
+h029,2026-11-23,3,Half of my order was perfect. The other half is somewhere between the depot and my door.,app
+h030,2026-11-24,5,"Expensive and it took ages to arrive, but honestly the best lamp I have ever owned.",web
+h031,2026-11-20,1,pacakge came totaly smashd and the glas was brokn inside,app
+h032,2026-11-21,5,"absolutly luv this blankt, super sofft and fast delivry",web
+h033,2026-11-22,2,"waitng 3 wekks for my ordr, stil nothng arived",app
+h034,2026-11-23,1,they chrged my crd twicee for one ordr,web
+h035,2026-11-24,3,"its ok i gues, nothng specal but does teh job",app
+h036,2026-11-20,2,refnd stil not recieved aftr retrning teh mugs a month ago,web
+h037,2026-11-21,1,"custmer suport never anwsers emails, compleatly usless",app
+h038,2026-11-22,2,wesbite keeps crashng wen i try to chekout,web
+h039,2026-11-23,2,"way to expensiv for wat u get, overpricd",app
+h040,2026-11-24,5,"gr8 qualty, looks exacly like teh foto, wil ordr agn",web
+h041,2026-11-20,1,"teh shelf brok aftr 2 days, cheep matrial",app
+h042,2026-11-21,3,"dilivery ok, product ok, nuthing to complane abt",web
+h043,2026-11-22,4,nice lamp but it cam 5 days l8,app
+h044,2026-11-23,2,box was ripd open and way to mch plastik wrap,web
+h045,2026-11-24,5,"best towls evr, my hole famly luvs them",app
+h046,2026-11-20,5,Perfect.,web
+h047,2026-11-21,1,Awful.,app
+h048,2026-11-22,3,Fine.,web
+h049,2026-11-23,2,Late again.,app
+h050,2026-11-24,1,Broken.,web
+h051,2026-11-20,1,Overcharged.,app
+h052,2026-11-21,4,Love it!,web
+h053,2026-11-22,3,Meh.,app
+h054,2026-11-23,1,No refund.,web
+h055,2026-11-24,2,Too pricey.,app
+h056,2026-11-20,1,App crashes.,web
+h057,2026-11-21,5,Thanks!,app
+h058,2026-11-22,1,Nobody replied.,web
+h059,2026-11-23,2,Crushed box.,app
+h060,2026-11-24,3,It's okay.,web

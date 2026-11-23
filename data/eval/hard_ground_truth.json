@@ -1,0 +1,400 @@
+{
+  "note": "Fictional reviews; labels were written before any model saw this set.",
+  "reviews": {
+    "h001": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h002": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "h003": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "h004": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "h005": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "pricing",
+        "product_quality"
+      ]
+    },
+    "h006": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "h007": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "h008": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h009": {
+      "category": "sarcasm",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h010": {
+      "category": "sarcasm",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h011": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h012": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "h013": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "h014": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "h015": {
+      "category": "sarcasm",
+      "sentiment": "negative",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "h016": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h017": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h018": {
+      "category": "mixed",
+      "sentiment": "negative",
+      "topics": [
+        "refund_process",
+        "customer_support"
+      ]
+    },
+    "h019": {
+      "category": "mixed",
+      "sentiment": "positive",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h020": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "h021": {
+      "category": "mixed",
+      "sentiment": "positive",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "h022": {
+      "category": "mixed",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h023": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h024": {
+      "category": "mixed",
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "h025": {
+      "category": "mixed",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h026": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "h027": {
+      "category": "mixed",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h028": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "h029": {
+      "category": "mixed",
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h030": {
+      "category": "mixed",
+      "sentiment": "positive",
+      "topics": [
+        "pricing",
+        "delivery_delay"
+      ]
+    },
+    "h031": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "packaging",
+        "product_quality"
+      ]
+    },
+    "h032": {
+      "category": "typos",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h033": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h034": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "h035": {
+      "category": "typos",
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "h036": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "h037": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "h038": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "h039": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "h040": {
+      "category": "typos",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h041": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h042": {
+      "category": "typos",
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "h043": {
+      "category": "typos",
+      "sentiment": "neutral",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h044": {
+      "category": "typos",
+      "sentiment": "negative",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "h045": {
+      "category": "typos",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h046": {
+      "category": "short",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h047": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": []
+    },
+    "h048": {
+      "category": "short",
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "h049": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "delivery_delay"
+      ]
+    },
+    "h050": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "product_quality"
+      ]
+    },
+    "h051": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "billing"
+      ]
+    },
+    "h052": {
+      "category": "short",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h053": {
+      "category": "short",
+      "sentiment": "neutral",
+      "topics": []
+    },
+    "h054": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "refund_process"
+      ]
+    },
+    "h055": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "pricing"
+      ]
+    },
+    "h056": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "app_usability"
+      ]
+    },
+    "h057": {
+      "category": "short",
+      "sentiment": "positive",
+      "topics": []
+    },
+    "h058": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "customer_support"
+      ]
+    },
+    "h059": {
+      "category": "short",
+      "sentiment": "negative",
+      "topics": [
+        "packaging"
+      ]
+    },
+    "h060": {
+      "category": "short",
+      "sentiment": "neutral",
+      "topics": []
+    }
+  }
+}

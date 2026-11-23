@@ -1,8 +1,9 @@
 """Anthropic implementation of the `Classifier` protocol.
 
 One `messages.create` call per batch, with structured output (`output_config` json_schema),
-effort `low` and thinking disabled. The response is never trusted: it is parsed and validated
-again with strict pydantic models, so only valid `Analysis` objects are returned (and cached).
+effort `low` and thinking off (`thinking_config`: Sonnet 5.5 rejects `disabled` and turns thinking
+off with `between_tools`). The response is never trusted: it is parsed and validated again with
+strict pydantic models, so only valid `Analysis` objects are returned (and cached).
 
 Failure handling:
 
@@ -148,6 +149,20 @@ def compute_prompt_version(system_prompt: str, schema: dict[str, Any]) -> str:
 
 PROMPT_VERSION = compute_prompt_version(SYSTEM_PROMPT, SCHEMA)
 
+_BETWEEN_TOOLS_MODELS = frozenset({"claude-sonnet-5-5"})
+
+
+def thinking_config(model: str) -> dict[str, str]:
+    """The request value that turns thinking off for `model`."""
+    return {"type": "between_tools" if model in _BETWEEN_TOOLS_MODELS else "disabled"}
+
+
+def build_client(api_key: SecretStr) -> anthropic.Anthropic:
+    """The SDK client; the only place the key is unwrapped. Retries are ours, so it gets none."""
+    return anthropic.Anthropic(
+        api_key=api_key.get_secret_value(), max_retries=0, timeout=REQUEST_TIMEOUT
+    )
+
 
 class _MessagesApi(Protocol):
     def create(self, **kwargs: Any) -> Message: ...
@@ -273,12 +288,7 @@ class AnthropicClassifier:
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
-        if client is None:
-            # The only place the key is unwrapped. Retries are ours, so the SDK gets none.
-            client = anthropic.Anthropic(
-                api_key=api_key.get_secret_value(), max_retries=0, timeout=REQUEST_TIMEOUT
-            )
-        self._client = client
+        self._client = build_client(api_key) if client is None else client
         self._model = model
         self._max_attempts = max_attempts
         self._sleep = sleep
@@ -393,7 +403,7 @@ class AnthropicClassifier:
             "model": self._model,
             "max_tokens": self._max_tokens,
             "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
-            "thinking": {"type": "disabled"},
+            "thinking": thinking_config(self._model),
             "system": SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         }

@@ -23,9 +23,10 @@ modified.
 
 Schema versions: 1 (stage 3) keyed reviews by external id alone; 2 scopes the id by source;
 3 adds the `analyses` cache table; 4 adds the `runs` table (one row per analyze run, with token
-usage and estimated cost); 5 adds the `summaries` table (one row per Telegram send attempt). A
+usage and estimated cost); 5 adds the `summaries` table (one row per Telegram send attempt); 6
+adds the `spend_ledger` table (one row per paid evaluation call, reserved before the call). A
 version 1 database cannot be upgraded in place and must be recreated from the CSV; versions 2
-to 4 are upgraded.
+to 5 are upgraded.
 """
 
 import datetime as dt
@@ -42,7 +43,7 @@ from review_radar.models import Analysis, Review, dedup_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 MIN_UPGRADABLE_VERSION = 2
 APPLICATION_ID = 0x52765264  # ASCII "RvRd"
 
@@ -114,8 +115,18 @@ CREATE TABLE IF NOT EXISTS summaries (
     finished_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_summaries_period ON summaries (period_start, period_end);
+CREATE TABLE IF NOT EXISTS spend_ledger (
+    id INTEGER PRIMARY KEY,
+    model TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('reserved', 'settled')),
+    amount_usd TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    settled_at TEXT
+);
 PRAGMA application_id = 1383486052;
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 COMMIT;
 """
 
@@ -641,6 +652,95 @@ def load_daily_analyses(
         ]
     except (ValueError, TypeError):  # includes pydantic.ValidationError
         raise _unreadable("analyses") from None
+
+
+def reserve_spend(
+    conn: sqlite3.Connection, model: str, amount: Decimal, *, now: dt.datetime | None = None
+) -> int:
+    """Durably reserve the worst-case cost of a call before it is made; return the entry id."""
+    stamp = utc_stamp(now)
+    try:
+        with conn:
+            cursor = conn.execute(
+                "INSERT INTO spend_ledger (model, status, amount_usd, created_at) "
+                "VALUES (?, 'reserved', ?, ?)",
+                (model, str(amount), stamp),
+            )
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot record the spend: {_reason(exc)}.") from None
+    if cursor.lastrowid is None:  # pragma: no cover (an INSERT always sets it)
+        raise StorageError("Cannot record the spend: no row id.")
+    return int(cursor.lastrowid)
+
+
+def settle_spend(
+    conn: sqlite3.Connection,
+    entry_id: int,
+    amount: Decimal,
+    *,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    now: dt.datetime | None = None,
+) -> None:
+    """Replace a reservation with the real cost, exactly once."""
+    params = (str(amount), input_tokens, output_tokens, utc_stamp(now), entry_id)
+    try:
+        with conn:
+            updated = conn.execute(
+                "UPDATE spend_ledger SET status = 'settled', amount_usd = ?, input_tokens = ?, "
+                "output_tokens = ?, settled_at = ? WHERE id = ? AND status = 'reserved'",
+                params,
+            ).rowcount
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot record the spend: {_reason(exc)}.") from None
+    if updated != 1:
+        raise StorageError("Cannot record the spend: no open reservation.")
+
+
+def ledger_total(conn: sqlite3.Connection) -> Decimal:
+    """Settled costs plus open reservations: never lower than what was really spent."""
+    try:
+        rows = conn.execute("SELECT amount_usd FROM spend_ledger").fetchall()
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read the spend: {_reason(exc)}.") from None
+    try:
+        return sum((Decimal(row[0]) for row in rows), Decimal(0))
+    except (InvalidOperation, TypeError):
+        raise _unreadable("the spend") from None
+
+
+def open_spend_ledger(conn: sqlite3.Connection, *, now: dt.datetime | None = None) -> None:
+    """Carry over the spend of runs recorded before the ledger existed (once)."""
+    stamp = utc_stamp(now)
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM spend_ledger LIMIT 1").fetchone() is not None:
+                return
+            costs = conn.execute("SELECT cost_usd FROM runs WHERE cost_usd IS NOT NULL").fetchall()
+            total = sum((Decimal(row[0]) for row in costs), Decimal(0))
+            if total > 0:
+                conn.execute(
+                    "INSERT INTO spend_ledger (model, status, amount_usd, created_at, settled_at) "
+                    "VALUES ('opening_balance', 'settled', ?, ?, ?)",
+                    (str(total), stamp, stamp),
+                )
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot record the spend: {_reason(exc)}.") from None
+    except (InvalidOperation, TypeError):
+        raise _unreadable("runs") from None
+
+
+def latest_review_date(conn: sqlite3.Connection) -> dt.date | None:
+    """Return the newest review date, or None when there are no reviews."""
+    try:
+        value = conn.execute("SELECT MAX(review_date) FROM reviews").fetchone()[0]
+    except sqlite3.Error as exc:
+        raise StorageError(f"Cannot read reviews: {_reason(exc)}.") from None
+    try:
+        return None if value is None else dt.date.fromisoformat(value)
+    except ValueError:
+        raise _unreadable("reviews") from None
 
 
 def summary_blocker(conn: sqlite3.Connection, start: dt.date, end: dt.date) -> str | None:

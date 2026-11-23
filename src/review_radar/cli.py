@@ -1,12 +1,16 @@
 """Command line interface for Review Radar."""
 
 import contextlib
+import dataclasses
 import datetime as dt
 import logging
 import os
 import sqlite3
 import sys
-from decimal import Decimal
+import tempfile
+from collections.abc import Callable, Iterator
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Literal, NoReturn
 
@@ -22,7 +26,7 @@ from review_radar.analysis import (
     AnalysisReport,
     analyze_pending,
 )
-from review_radar.anthropic_classifier import PROMPT_VERSION, AnthropicClassifier
+from review_radar.anthropic_classifier import PROMPT_VERSION, AnthropicClassifier, build_client
 from review_radar.classifier import Classifier, ClassifierError
 from review_radar.config import PROJECT_ROOT, ConfigError, Mode, Settings
 from review_radar.dashboard import (
@@ -32,9 +36,29 @@ from review_radar.dashboard import (
     render_dashboard,
     write_dashboard,
 )
+from review_radar.evaluation import (
+    DATASETS,
+    ErrorRow,
+    EvalError,
+    EvalReport,
+    GuardedClient,
+    ModelResult,
+    Prediction,
+    Scores,
+    SpendGuard,
+    SpendLedger,
+    Truth,
+    estimate_cost_for,
+    list_errors,
+    load_truth,
+    render_markdown,
+    score,
+    scores_by_category,
+)
 from review_radar.fixture_classifier import FixtureClassifier
+from review_radar.hashing import text_hash
 from review_radar.ingest import IngestError, IngestResult, read_reviews
-from review_radar.models import Usage
+from review_radar.models import Analysis, Review, Usage
 from review_radar.pricing import PRICES_PER_MTOK, estimate_cost
 from review_radar.storage import (
     RunRecord,
@@ -44,6 +68,12 @@ from review_radar.storage import (
     connect,
     count_reviews,
     finish_summary,
+    latest_review_date,
+    ledger_total,
+    list_runs,
+    load_analyses,
+    open_spend_ledger,
+    pending_texts,
     save_reviews,
     save_run,
     summary_blocker,
@@ -424,6 +454,362 @@ def dashboard_command(
             f"Warning: {data.not_analyzed} review(s) are not analyzed; run analyze.", err=True
         )
     typer.echo(f"Dashboard written: {page}")
+
+
+class EvalDataset(StrEnum):
+    """Which reviews `eval` scores."""
+
+    REGULAR = "regular"
+    HARD = "hard"
+    ALL = "all"
+
+
+def make_eval_client(api_key: SecretStr, model: str, guard: SpendGuard) -> GuardedClient:
+    """The real API client behind the spend guard. Tests replace this function."""
+    return GuardedClient(build_client(api_key), guard, model)
+
+
+@app.command("eval")
+def eval_command(
+    dataset: Annotated[
+        EvalDataset, typer.Option("--dataset", help="Reviews to score (generator data only).")
+    ] = EvalDataset.ALL,
+    compare: Annotated[
+        bool, typer.Option("--compare", help="Run both the main and the compare model.")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", help="Live mode: really call the API (it costs money).")
+    ] = False,
+    max_cost: Annotated[
+        str, typer.Option("--max-cost", help="Hard limit in USD over all runs of this eval.")
+    ] = "1.00",
+    report_path: Annotated[
+        Path | None, typer.Option("--report", help="Also write the Markdown report here.")
+    ] = None,
+) -> None:
+    """Score classifiers against ground truth. Live mode only estimates the cost without --yes."""
+    limit = _money(max_cost)
+    names = ["regular", "hard"] if dataset is EvalDataset.ALL else [dataset.value]
+    settings = _load_settings()
+    try:
+        live = settings.resolved_mode() is Mode.LIVE
+        if compare and not live:
+            _fail("--compare needs live mode; demo mode has only the fixture classifier.")
+        data = {name: _load_eval_dataset(name) for name in names}
+        models = list(dict.fromkeys(_eval_models(settings, compare)))
+        if live and not yes:
+            _echo_estimate(models, data)
+            return
+        path = settings.database_path.with_name(f"{settings.database_path.stem}-eval.db")
+        with contextlib.closing(connect(path)) as conn:
+            for reviews, _ in data.values():
+                save_reviews(conn, reviews)
+            open_spend_ledger(conn)
+            classifiers = _eval_classifiers(conn, settings, models, data, limit, live)
+            outcome = _run_evaluation(conn, classifiers, data)
+            report = _mark_incomplete(
+                _eval_report(conn, classifiers, data, "live" if live else "demo"), outcome
+            )
+            total = _recorded_spend(conn)
+        if report_path is not None:
+            _write_report(report_path, render_markdown(report))
+    except AnalysisInterrupted:
+        note = " The report was not updated." if report_path is not None else ""
+        typer.echo(f"Interrupted.{note}", err=True)
+        raise typer.Exit(130) from None
+    except AnalysisAborted as exc:
+        note = " The report was not updated." if report_path is not None else ""
+        _fail(f"evaluation stopped: {_abort_detail(exc)}.{note}")
+    except (StorageError, ConfigError, ClassifierError, EvalError, IngestError) as exc:
+        _fail(exc)
+    typer.echo(render_markdown(report, include_errors=False), nl=False)
+    typer.echo("Cost: $0 (demo)" if not live else f"Spent in total: ${_usd(total)} of ${limit}")
+    _finish_evaluation(report, outcome)
+
+
+def _money(value: str) -> Decimal:
+    try:
+        amount = Decimal(value)
+    except InvalidOperation:
+        raise typer.BadParameter("--max-cost must be an amount in USD.") from None
+    if not amount.is_finite() or amount < 0:
+        raise typer.BadParameter("--max-cost must be an amount in USD.")
+    return amount
+
+
+def _usd(amount: Decimal) -> Decimal:
+    return amount.quantize(Decimal("0.000001"), ROUND_HALF_UP)
+
+
+def _load_eval_dataset(name: str) -> tuple[list[Review], dict[str, Truth]]:
+    source = DATASETS[name]
+    return read_reviews(source.csv).reviews, load_truth(source.truth)
+
+
+def _eval_models(settings: Settings, compare: bool) -> list[str]:
+    if compare:
+        return [settings.anthropic_model, settings.anthropic_compare_model]
+    return [settings.anthropic_model]
+
+
+def _echo_estimate(
+    models: list[str], data: dict[str, tuple[list[Review], dict[str, Truth]]]
+) -> None:
+    texts = list(
+        {
+            text_hash(review.text): review.text
+            for reviews, _ in data.values()
+            for review in reviews
+        }.values()
+    )
+    estimates = [estimate_cost_for(model, texts) for model in models]
+    for item in estimates:
+        typer.echo(
+            f"{item.model}: {item.texts} texts, {item.input_tokens} input and "
+            f"{item.output_tokens} output tokens, expected ${_usd(item.expected_usd)}, "
+            f"upper ${_usd(item.upper_usd)}"
+        )
+    expected = sum((item.expected_usd for item in estimates), Decimal(0))
+    upper = sum((item.upper_usd for item in estimates), Decimal(0))
+    typer.echo(f"Total: expected ${_usd(expected)}, upper ${_usd(upper)}")
+    typer.echo("Estimate only: nothing was sent. Add --yes to run it.")
+
+
+def _recorded_spend(conn: sqlite3.Connection) -> Decimal:
+    return ledger_total(conn)
+
+
+def _mark_incomplete(report: EvalReport, stopped: AnalysisReport | None) -> EvalReport:
+    failed = sum(result.failed for result in report.models)
+    if stopped is None and not failed:
+        return report
+    reason = "" if stopped is None else f", stopped by {stopped.fatal_reason or stopped.outcome}"
+    return dataclasses.replace(report, incomplete=f"{failed} answers are missing{reason}")
+
+
+def _eval_classifiers(
+    conn: sqlite3.Connection,
+    settings: Settings,
+    models: list[str],
+    data: dict[str, tuple[list[Review], dict[str, Truth]]],
+    limit: Decimal,
+    live: bool,
+) -> list[Classifier]:
+    if not live:
+        return [FixtureClassifier.from_file(DEMO_FIXTURES)]
+    key = settings.anthropic_api_key
+    if key is None:  # pragma: no cover (resolved_mode() guarantees a key in live mode)
+        raise ConfigError("ANTHROPIC_API_KEY is not set.")
+    spent = _recorded_spend(conn)
+    hashes = {text_hash(review.text) for reviews, _ in data.values() for review in reviews}
+    upper = Decimal(0)
+    for model in models:
+        pending = pending_texts(
+            conn, provider=AnthropicClassifier.provider, model=model, prompt_version=PROMPT_VERSION
+        )
+        texts = [item.text for item in pending if item.text_hash in hashes]
+        upper += estimate_cost_for(model, texts).upper_usd
+    if spent + upper > limit:
+        _fail(
+            f"Spend limit: ${_usd(spent)} already spent plus an upper estimate of ${_usd(upper)} "
+            f"is over the limit of ${limit}. Nothing was sent."
+        )
+    guard = SpendGuard(limit, spent, SpendLedger(conn))
+    return [
+        AnthropicClassifier(api_key=key, model=model, client=make_eval_client(key, model, guard))
+        for model in models
+    ]
+
+
+def _run_evaluation(
+    conn: sqlite3.Connection,
+    classifiers: list[Classifier],
+    data: dict[str, tuple[list[Review], dict[str, Truth]]],
+) -> AnalysisReport | None:
+    """Analyze each dataset for each classifier; return the report that stopped it, if any."""
+    for classifier in classifiers:
+        for reviews, _ in data.values():
+            hashes = {text_hash(review.text) for review in reviews}
+            run_errors: list[StorageError] = []
+            started = dt.datetime.now(dt.UTC)
+            try:
+                report = analyze_pending(conn, classifier, max_calls=AUTO, text_hashes=hashes)
+            except (AnalysisAborted, AnalysisInterrupted) as exc:
+                _record_run(conn, classifier, exc.report, started, run_errors)
+                _echo_run_errors(run_errors)
+                raise
+            _record_run(conn, classifier, report, started, run_errors)
+            if run_errors:
+                raise run_errors[0]
+            if report.fatal_reason is not None or report.stop_reason is not None:
+                return report
+    return None
+
+
+def _eval_report(
+    conn: sqlite3.Connection,
+    classifiers: list[Classifier],
+    data: dict[str, tuple[list[Review], dict[str, Truth]]],
+    mode: str,
+) -> EvalReport:
+    runs = list_runs(conn)
+    results = []
+    errors: dict[str, tuple[ErrorRow, ...]] = {}
+    for classifier in classifiers:
+        analyses = load_analyses(
+            conn,
+            provider=classifier.provider,
+            model=classifier.model,
+            prompt_version=classifier.prompt_version,
+        )
+        dataset_scores: dict[str, Scores] = {}
+        category_scores: dict[str, Scores] = {}
+        wrong: list[ErrorRow] = []
+        for name, (reviews, truth) in data.items():
+            predictions = _predictions(reviews, analyses)
+            dataset_scores[name] = score(truth, predictions)
+            category_scores.update(scores_by_category(truth, predictions))
+            wrong += list_errors(truth, predictions)
+        errors[classifier.model] = tuple(wrong)
+        own = [
+            run
+            for run in runs
+            if (run.provider, run.model, run.prompt_version)
+            == (classifier.provider, classifier.model, classifier.prompt_version)
+        ]
+        cost = sum((run.cost_usd or Decimal(0) for run in own), Decimal(0))
+        analyzed = sum(run.analyzed for run in own)
+        results.append(
+            ModelResult(
+                model=classifier.model,
+                dataset_scores=dataset_scores,
+                category_scores=category_scores,
+                usage=Usage(
+                    input_tokens=sum(run.input_tokens for run in own),
+                    output_tokens=sum(run.output_tokens for run in own),
+                ),
+                cost_usd=cost,
+                reviews=analyzed,
+                cost_per_1000=cost * 1000 / analyzed if analyzed else Decimal(0),
+                failed=sum(item.missing for item in dataset_scores.values()),
+            )
+        )
+    return EvalReport(models=tuple(results), mode=mode, errors=errors)
+
+
+def _predictions(reviews: list[Review], analyses: dict[str, Analysis]) -> dict[str, Prediction]:
+    predictions = {}
+    for review in reviews:
+        analysis = analyses.get(text_hash(review.text))
+        if analysis is not None and review.external_id is not None:
+            predictions[review.external_id] = Prediction(
+                analysis.sentiment, frozenset(analysis.topics)
+            )
+    return predictions
+
+
+def _write_report(path: Path, text: str) -> None:
+    temporary: str | None = None
+    try:
+        descriptor, temporary = tempfile.mkstemp(
+            dir=path.parent, prefix=f".{path.name}-", suffix=".tmp"
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
+            stream.write(text)
+        os.replace(temporary, path)
+    except OSError as exc:
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+        _fail(f"Cannot write the report: {exc.strerror or type(exc).__name__}.")
+
+
+def _finish_evaluation(report: EvalReport, stopped: AnalysisReport | None) -> None:
+    failed = sum(result.failed for result in report.models)
+    if stopped is not None and stopped.fatal_reason == "budget_exceeded":
+        _fail(f"The spend limit stopped the evaluation; failed reviews: {failed}.")
+    if stopped is not None:
+        detail = stopped.fatal_message or stopped.outcome
+        _fail(f"The evaluation stopped ({detail}); failed reviews: {failed}.")
+    if failed:
+        _fail(f"The evaluation is incomplete; failed reviews: {failed}.")
+
+
+@contextlib.contextmanager
+def _temporary_env(values: dict[str, str]) -> Iterator[None]:
+    saved = {name: os.environ.get(name) for name in values}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def _step(name: str, action: Callable[[], None]) -> None:
+    typer.echo(f"Step: {name}")
+    try:
+        action()
+    except typer.Exit as exc:
+        if exc.exit_code:
+            typer.echo(f"Step failed: {name}", err=True)
+        raise
+
+
+@app.command("run")
+def run_command(
+    csv_path: Annotated[Path | None, typer.Argument(help="Reviews CSV (not with --demo).")] = None,
+    demo: Annotated[
+        bool, typer.Option("--demo", help="Sample data, own database, no key, nothing sent.")
+    ] = False,
+    date: Annotated[
+        dt.datetime | None,
+        typer.Option("--date", formats=[DATE_FORMAT], help="Day of the summary."),
+    ] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Dashboard folder (default: site/).")
+    ] = None,
+) -> None:
+    """Run the whole pipeline: ingest, analyze, summary and dashboard. Stops at a failed step."""
+    if demo == (csv_path is not None):
+        raise typer.BadParameter("Give a CSV path, or use --demo (not both).")
+    if not demo:
+        _run_steps(csv_path, date, out, dry_run=False)
+        return
+    settings = _load_settings()
+    database = settings.database_path.with_name(f"{settings.database_path.stem}-demo.db")
+    typer.echo("[DEMO] Sample data, separate database, no API call, nothing is sent.")
+    with _temporary_env({"REVIEW_RADAR_MODE": "demo", "DATABASE_PATH": str(database)}):
+        _run_steps(DATASETS["regular"].csv, date, out, dry_run=True)
+
+
+def _run_steps(
+    csv_path: Path | None, date: dt.datetime | None, out: Path | None, *, dry_run: bool
+) -> None:
+    if csv_path is None:  # pragma: no cover (run_command guarantees a path)
+        raise typer.BadParameter("A CSV path is required.")
+    _step("ingest", lambda: ingest(csv_path, None, "utf-8-sig", False))
+    _step("analyze", lambda: analyze(None, None))
+
+    def summarize() -> None:
+        day = date if date is not None or not dry_run else _latest_day()
+        summary_command(day, None, None, dry_run, False, False, False)
+
+    _step("summary", summarize)
+    _step("dashboard", lambda: dashboard_command(out))
+
+
+def _latest_day() -> dt.datetime | None:
+    settings = _load_settings()
+    try:
+        with contextlib.closing(connect(settings.database_path)) as conn:
+            latest = latest_review_date(conn)
+    except StorageError as exc:
+        _fail(exc)
+    return None if latest is None else dt.datetime.combine(latest, dt.time())
 
 
 def make_telegram_sender(*, token: SecretStr, chat_id: SecretStr) -> TelegramSender:

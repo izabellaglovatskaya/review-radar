@@ -170,7 +170,7 @@ class TestFinish:
 
 class TestSchemaV5:
     def test_version_constants(self) -> None:
-        assert storage.SCHEMA_VERSION == 5
+        assert storage.SCHEMA_VERSION == 6
         assert storage.MIN_UPGRADABLE_VERSION == 2
 
     def test_v4_database_is_upgraded_and_keeps_its_data(self, tmp_path: Path) -> None:
@@ -187,6 +187,6 @@ class TestSchemaV5:
             assert raw.execute("PRAGMA user_version").fetchone()[0] == 4
 
         with contextlib.closing(connect(path)) as conn:
-            assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == storage.SCHEMA_VERSION
             assert conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
             assert claim(conn).summary_id is not None
