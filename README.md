@@ -49,6 +49,12 @@ uv installs the right Python (3.13) for you.
 
 3. Open `site/index.html` in Chrome. The page works from disk and makes no network requests.
 
+   ![The Review Radar dashboard on the demo data: four count tiles, a line chart of sentiment by
+   day, a bar chart of sentiment shares and a bar chart of complaint topics, each followed by a
+   table of the same numbers](docs/screenshots/dashboard.png)
+
+   *The dashboard built from the demo data. Each chart has a table with the same numbers.*
+
 The printed summary looks like this:
 
 ```text
@@ -118,6 +124,12 @@ every answer is cached.
    ```
 
    The same period is sent only once. A second run says "Already sent" and exits with 0.
+
+   ![A Telegram message titled "Review Radar: 2026-11-10": 30 reviews, 12 positive (40%), 6
+   neutral (20%), 12 negative (40%), and the top complaint topics Product quality 5, Billing 3
+   and Delivery delay 3](docs/screenshots/telegram-summary.png)
+
+   *The summary for one day of the sample data, as it looks in Telegram.*
 
 5. Build the dashboard: `uv run review-radar dashboard`.
 
