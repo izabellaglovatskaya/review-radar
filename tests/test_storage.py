@@ -755,6 +755,56 @@ class TestNewDatabaseFilePermissions:
         assert f"chmod 600 {path.name}" in caplog.text
         assert stat.S_IMODE(path.stat().st_mode) == 0o644  # warned, never changed
 
+    def test_no_permission_warning_for_a_file_that_is_not_a_database(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Act as POSIX with a shared file on any OS: the error alone must be reported.
+        monkeypatch.setattr(storage.sys, "platform", "linux")
+        monkeypatch.setattr(storage, "readable_by_others", lambda _mode: True)
+        path = db_path(tmp_path)
+        path.write_bytes(b"not a database at all, just some bytes" * 4)
+
+        with (
+            caplog.at_level(logging.WARNING, logger="review_radar"),
+            pytest.raises(StorageError, match="Cannot use radar.db as a database"),
+        ):
+            connect(path)
+
+        assert caplog.records == []
+
+    def test_the_permission_warning_comes_after_the_schema_check(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        path = db_path(tmp_path)
+        connect(path).close()
+        monkeypatch.setattr(storage.sys, "platform", "linux")
+        monkeypatch.setattr(storage, "readable_by_others", lambda _mode: True)
+
+        with caplog.at_level(logging.WARNING, logger="review_radar"):
+            connect(path).close()
+
+        assert "chmod 600 radar.db" in caplog.text
+
+    def test_a_failed_permission_check_does_not_block_the_database(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        path = db_path(tmp_path)
+        connect(path).close()
+        monkeypatch.setattr(storage.sys, "platform", "linux")
+        real_stat = Path.stat
+
+        def failing_stat(self: Path, **kw: Any) -> os.stat_result:
+            if self == path:
+                raise PermissionError(13, "Permission denied")
+            return real_stat(self, **kw)
+
+        monkeypatch.setattr(Path, "stat", failing_stat)
+
+        with caplog.at_level(logging.WARNING, logger="review_radar"):
+            connect(path).close()
+
+        assert caplog.records == []
+
     def test_no_warning_for_a_private_database(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:

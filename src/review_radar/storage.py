@@ -328,7 +328,6 @@ def connect(path: Path) -> sqlite3.Connection:
     try:
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         _create_private_file(path)
-        _warn_if_shared(path)
         conn = sqlite3.connect(path)
     except (sqlite3.Error, OSError) as exc:
         raise StorageError(f"Cannot open the database: {_reason(exc)}.") from None
@@ -340,6 +339,7 @@ def connect(path: Path) -> sqlite3.Connection:
     except BaseException:
         conn.close()
         raise
+    _warn_if_shared(path)  # only for a real Review Radar database: an error says enough otherwise
     return conn
 
 
@@ -360,7 +360,14 @@ def readable_by_others(mode: int) -> bool:
 
 def _warn_if_shared(path: Path) -> None:
     """Warn (never chmod) when an older database file is open to other users (POSIX only)."""
-    if sys.platform != "win32" and readable_by_others(path.stat().st_mode):
+    if sys.platform == "win32":
+        return
+    try:
+        mode = path.stat().st_mode
+    except OSError as exc:  # the database is open, so this is only a lost warning
+        logger.debug("Cannot check the permissions of %s: %s", path.name, _reason(exc))
+        return
+    if readable_by_others(mode):
         logger.warning(
             "%s can be read by other users and holds review text; run: chmod 600 %s",
             path.name,
