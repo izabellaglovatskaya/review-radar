@@ -472,7 +472,7 @@ class AnthropicClassifier:
                 if verdict.kind == "split":
                     logger.warning("Request rejected (%s, %s)", verdict.reason, _describe(exc))
                     raise _InvalidOutput(verdict.reason) from None
-                if verdict.kind == "fatal":
+                if verdict.fatal is not None:  # set exactly when the kind is "fatal"
                     fatal = verdict.fatal
                     logger.warning("Anthropic request failed fatally (%s): %s", fatal.reason, fatal)
                     raise fatal from None

@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterator
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Literal, NoReturn
+from typing import Annotated, Literal, NoReturn, TypedDict
 
 import typer
 from jinja2 import TemplateError
@@ -543,7 +543,7 @@ def _usd(amount: Decimal) -> Decimal:
 
 def _load_eval_dataset(name: str) -> tuple[list[Review], dict[str, Truth]]:
     source = DATASETS[name]
-    return read_reviews(source.csv).reviews, load_truth(source.truth)
+    return list(read_reviews(source.csv).reviews), load_truth(source.truth)
 
 
 def _eval_models(settings: Settings, compare: bool) -> list[str]:
@@ -959,7 +959,15 @@ def _telegram_credentials(settings: Settings) -> tuple[SecretStr, SecretStr]:
     return token, chat_id
 
 
-def _analysis_key(settings: Settings) -> dict[str, str]:
+class AnalysisKey(TypedDict):
+    """The classifier key that analyses are stored and looked up under."""
+
+    provider: str
+    model: str
+    prompt_version: str
+
+
+def _analysis_key(settings: Settings) -> AnalysisKey:
     """The classifier key `analyze` stores results under in the current mode."""
     if settings.resolved_mode() is Mode.LIVE:
         return {
@@ -978,7 +986,7 @@ def _analysis_key(settings: Settings) -> dict[str, str]:
 def _deliver(
     conn: sqlite3.Connection,
     result: Summary,
-    key: dict[str, str],
+    key: AnalysisKey,
     message: str,
     credentials: tuple[SecretStr, SecretStr],
     force: bool,

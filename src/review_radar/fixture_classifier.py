@@ -216,7 +216,7 @@ def parse_strict_entry(entry: object) -> Analysis:
     parsed = [_exact_topic(t, position) for position, t in enumerate(topics)]
     if len(set(parsed)) != len(parsed):
         raise ValueError("duplicate topics")
-    return Analysis(sentiment=_exact_sentiment(sentiment), topics=parsed, confidence=None)
+    return Analysis(sentiment=_exact_sentiment(sentiment), topics=tuple(parsed), confidence=None)
 
 
 def _exact_sentiment(value: str) -> Sentiment:
@@ -247,7 +247,7 @@ def _fallback(item: ClassifyItem) -> Analysis:
     topics = _topics(normalized) if sentiment is not Sentiment.POSITIVE else []
     if not topics and sentiment is Sentiment.NEGATIVE:
         topics = [Topic.OTHER]
-    return Analysis(sentiment=sentiment, topics=topics, confidence=FALLBACK_CONFIDENCE)
+    return Analysis(sentiment=sentiment, topics=tuple(topics), confidence=FALLBACK_CONFIDENCE)
 
 
 def _sentiment(normalized: str, rating: int | None) -> Sentiment:

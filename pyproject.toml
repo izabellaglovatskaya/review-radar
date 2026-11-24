@@ -26,6 +26,7 @@ dev = [
     "ruff>=0.9",
     "pre-commit>=4.0",
     "pyyaml>=6.0",
+    "mypy>=1.19",
 ]
 
 [build-system]
@@ -46,6 +47,13 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # assert is the normal way to check things in pytest.
 "tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.13"
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

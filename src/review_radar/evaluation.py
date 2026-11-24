@@ -348,7 +348,9 @@ class SpendGuard:
 class GuardedClient:
     """Wraps an Anthropic client: refuses any call whose worst case could pass the limit."""
 
-    def __init__(self, client: MessagesClient, guard: SpendGuard, model: str) -> None:
+    def __init__(
+        self, client: anthropic.Anthropic | MessagesClient, guard: SpendGuard, model: str
+    ) -> None:
         if model not in PRICES_PER_MTOK:
             raise EvalError(f"No price is known for the model {model}.")
         self._client = client

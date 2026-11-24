@@ -204,3 +204,19 @@ def test_pyyaml_is_a_direct_dev_dependency() -> None:
         dev = tomllib.load(f)["dependency-groups"]["dev"]
 
     assert any(dep.lower().startswith("pyyaml") for dep in dev)
+
+
+def test_lint_job_type_checks_src_in_its_own_step() -> None:
+    steps = [step for step in _steps("lint") if "mypy" in step.get("run", "")]
+
+    assert len(steps) == 1
+    assert steps[0]["run"].strip() == "uv run mypy src"
+    assert "mypy" in steps[0]["name"].lower()
+
+
+def test_mypy_is_a_direct_dev_dependency_and_configured() -> None:
+    with (ROOT / "pyproject.toml").open("rb") as f:
+        config = tomllib.load(f)
+
+    assert any(dep.startswith("mypy") for dep in config["dependency-groups"]["dev"])
+    assert config["tool"]["mypy"]["python_version"] == "3.13"

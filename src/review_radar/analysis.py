@@ -347,9 +347,9 @@ def _run_batch(
         totals.failures[exc.reason] += _review_count(batch)
         return exc.reason in TRANSIENT_REASONS
     except BaseException as exc:
-        partial = get_partial(exc)
-        if partial is not None:
-            _absorb_quietly(conn, batch, items, partial, key, now, totals)
+        paid = get_partial(exc)
+        if paid is not None:
+            _absorb_quietly(conn, batch, items, paid, key, now, totals)
         raise
     return _absorb(conn, batch, items, result, key, now, totals, leftover=MISSING_RESULT)
 
