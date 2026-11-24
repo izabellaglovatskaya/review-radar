@@ -28,7 +28,7 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Eval | `review-radar eval` scores predictions against ground truth on the regular sample and a fictional hard set (`data/eval`, labelled by an AI agent before any model saw it); `--compare` runs Haiku 5.5 and Sonnet 5.5. Results are in [EVAL.md](EVAL.md). The default stays Haiku 5.5: Sonnet is 19.5 times the price and its lead is not statistically reliable on this sample. Live mode only prints an estimate unless `--yes` is given. Spend is limited by `--max-cost` across runs: schema version 6 adds a `spend_ledger` table, the worst case of each call is written before the call and replaced by the real cost after it, so a crash or timeout can overstate the total but never understate it. Eval uses its own `<stem>-eval.db`. Sonnet 5.5 rejects `thinking: disabled`, so it uses `between_tools`. No fallback model is used, so a refusal counts as an error. |
 | Run | `review-radar run --demo` runs ingest, analyze, a dry-run summary and the dashboard on the sample in its own `<stem>-demo.db`, with no key, network or Telegram send. `review-radar run CSV` runs the same steps live and stops at the first failed step. |
 | CI | GitHub Actions on Ubuntu only (`.github/workflows/ci.yml`), four jobs: lint (ruff check, format check and `mypy src`), test (default pytest suite), browser (headless Chrome preinstalled on the runner, Playwright locked in the `browser` dependency group; `REVIEW_RADAR_REQUIRE_BROWSER=1` turns a missing browser into a failure instead of a silent skip) and gitleaks over the full git history (`fetch-depth: 0`, the release binary checked by SHA-256, the same version as the pre-commit hook, findings redacted). Python jobs install with `uv sync --locked` and take Python from `.python-version`. Only pull request runs are cancelled by a newer push, so every commit on `main` is checked. No secrets: the token is read-only, checkout keeps no credentials, the test jobs run in demo mode with blank keys, and live tests stay deselected. Actions are pinned to commit SHAs. The workflow is checked without GitHub by `tests/test_ci_workflow.py` and by actionlint (`uvx --from actionlint-py==1.7.12.24 actionlint .github/workflows/ci.yml`). |
-| Publishing | No GitHub Pages for now (until the repository is made public). README uses screenshots. |
+| Publishing | No GitHub Pages for now (until the repository is made public). README is meant to show screenshots of the Telegram message and the dashboard; `docs/screenshots/` does not exist yet, so README shows the demo message as text and has no images. The repository stays private until the owner decides. |
 | Scheduling | The interface is `review-radar run` (or separate `ingest`/`analyze`/`summary`/`dashboard` jobs). Windows Task Scheduler and cron setup, exit codes, failure handling and the no-double-send rules are documented in [SCHEDULING.md](SCHEDULING.md), not automated. |
 
 ## Stages
@@ -141,7 +141,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `scripts/generate_reviews.py`: `generate()` does not validate `n` and `days`; the two output files are not written atomically; the company name is hardcoded in one template [10].
 - `scripts/generate_reviews.py`, `ingest.py`: a few public classes and functions lack docstrings [any].
 - `tests/test_generate_reviews.py`: `import random` inside a test function [any].
-- README: explain that ratings are deliberately noisy against sentiment, so a rating-based fallback scores lower in eval [10].
+- ~~README: explain that ratings are deliberately noisy against sentiment, so a rating-based fallback scores lower in eval [10].~~ Done in stage 10.
 
 ### Stage 3
 
@@ -193,7 +193,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `anthropic_classifier.py`: sentiment `Literal[...]` duplicates the `Sentiment` enum [any].
 - ~~`anthropic_classifier.py`: the SDK reads `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` from the environment; a stray base URL would send the key and texts elsewhere; pass `base_url` explicitly or warn [9].~~ Done in stage 9: `build_client` warns, naming only the variable; where requests go is unchanged.
 - `anthropic_classifier.py`: the docstring says the key is not stored; the SDK client holds it [any].
-- README: `ANTHROPIC_LOG=debug` makes the SDK log request bodies (review text) [10].
+- ~~README: `ANTHROPIC_LOG=debug` makes the SDK log request bodies (review text) [10].~~ Done in stage 10.
 - `cli.py`: fatal, aborted and partial failures all exit 1; consider distinct exit codes for stage 8 scheduling [8].
 - `cli.py` / `analysis.py` / classifier: the same fatal error is logged up to three times [any].
 - `cli.py`: `DEMO_PROVIDER = "fixture"` duplicates `FixtureClassifier.provider` [any].
@@ -276,6 +276,20 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - CI: gitleaks scans the history reachable from the checked-out ref (the merge ref on a pull request), not other branches, and uses the default rules [any].
 - CI: a browser test that loses the module-level `browser` marker would leave the browser job with no tests (pytest exit 5, loud) and be skipped in the test job; no count guard [any].
 - Not done: refusing to start when `ANTHROPIC_BASE_URL` (or another SDK override) is set, or passing `base_url` explicitly; this changes behaviour and is an owner decision. Today it is a warning only.
+
+### Stage 10
+
+- `tests/test_docs.py`: the passport test requires every "My answer" field to stay empty, so it fails as soon as the owner writes answers; it also checks only the first line after the field [any].
+- `tests/test_docs.py`: the Mermaid check counts blocks only; no validator ran on the diagrams (fetching mermaid-cli was blocked), they were checked by reading [any].
+- README and ARCHITECTURE: "review text never appears in logs" is stated as absolute; it is the design and is tested for the main paths, but not proven for every exception message [any].
+- ARCHITECTURE: "the key is unwrapped once" holds for the Anthropic key; the bot token and chat id are unwrapped in `TelegramSender` on each send [any].
+- ARCHITECTURE: "outbound HTTPS only" to Anthropic holds unless `ANTHROPIC_BASE_URL` is set (warning only, see stage 9) [any].
+- ARCHITECTURE: the CSP is a `<meta>` tag, not an HTTP header (no `frame-ancestors`); say so [any].
+- ARCHITECTURE: the state diagram lists "4xx, refused connection" as certain failures; connect and pool timeouts are certain failures too [any].
+- README: say that the database holds the full review text and must not be shared or attached to issues, nor `.env` or `--verbose` output [any].
+- README: "CI runs on every push" means pushes to `main` and pull requests [any].
+- README: the CI badge and the `git clone` URL work for others only once the repository is public; they name the owner's GitHub account [publish].
+- Not done here: the code items tagged [10] in earlier sections (dependency floors, `generate_reviews.py` checks, splitting the generated part of EVAL.md); this stage changed documentation only.
 
 ### First live run
 
