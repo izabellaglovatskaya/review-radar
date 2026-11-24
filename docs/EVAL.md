@@ -18,7 +18,7 @@ $0.022 per extra correct review, at 19.5 times the price. On this sample the dif
 statistically reliable (paired exact McNemar test on fully correct reviews: p = 0.15 overall,
 0.21 on regular, 0.73 on hard).
 
-**Option, for the owner to decide: Sonnet 5.5 where sarcasm matters.** Sonnet got the sentiment of
+**An option, not taken: Sonnet 5.5 where sarcasm matters.** Sonnet got the sentiment of
 all 15 sarcastic reviews right and Haiku 14 of 15, which is one review. On the hard set as a whole Sonnet got 54
 of 60 fully right and Haiku 52, so the sample cannot show that Sonnet is better on hard reviews.
 Switching needs only `ANTHROPIC_MODEL=claude-sonnet-5-5`.

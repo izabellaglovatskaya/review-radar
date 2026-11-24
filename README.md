@@ -231,6 +231,7 @@ More documents:
 
 The project is under the MIT license, see [LICENSE](LICENSE).
 
-The review agents in `.claude/agents/` were copied from another MIT-licensed project. Their
-license is kept separately, in
+The review agents in `.claude/agents/` were copied from
+[Everything Claude Code](https://github.com/affaan-m/everything-claude-code) by Affaan M, which is
+also under the MIT license. Their license is kept separately, in
 [.claude/agents/LICENSE-everything-claude-code.txt](.claude/agents/LICENSE-everything-claude-code.txt).

@@ -97,3 +97,5 @@ def test_readme_names_the_license_and_the_separate_agents_license() -> None:
 
     assert "[LICENSE](LICENSE)" in section
     assert f"({AGENTS_LICENSE})" in section
+    assert "[Everything Claude Code](https://github.com/affaan-m/everything-claude-code)" in section
+    assert "Affaan M" in section

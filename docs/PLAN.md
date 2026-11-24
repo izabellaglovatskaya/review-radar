@@ -28,7 +28,7 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Eval | `review-radar eval` scores predictions against ground truth on the regular sample and a fictional hard set (`data/eval`, labelled by an AI agent before any model saw it); `--compare` runs Haiku 5.5 and Sonnet 5.5. Results are in [EVAL.md](EVAL.md). The default stays Haiku 5.5: Sonnet is 19.5 times the price and its lead is not statistically reliable on this sample. Live mode only prints an estimate unless `--yes` is given. Spend is limited by `--max-cost` across runs: schema version 6 adds a `spend_ledger` table, the worst case of each call is written before the call and replaced by the real cost after it, so a crash or timeout can overstate the total but never understate it. Eval uses its own `<stem>-eval.db`. Sonnet 5.5 rejects `thinking: disabled`, so it uses `between_tools`. No fallback model is used, so a refusal counts as an error. |
 | Run | `review-radar run --demo` runs ingest, analyze, a dry-run summary and the dashboard on the sample in its own `<stem>-demo.db`, with no key, network or Telegram send. `review-radar run CSV` runs the same steps live and stops at the first failed step. |
 | CI | GitHub Actions on Ubuntu only (`.github/workflows/ci.yml`), four jobs: lint (ruff check, format check and `mypy src`), test (default pytest suite), browser (headless Chrome preinstalled on the runner, Playwright locked in the `browser` dependency group; `REVIEW_RADAR_REQUIRE_BROWSER=1` turns a missing browser into a failure instead of a silent skip) and gitleaks over the full git history (`fetch-depth: 0`, the release binary checked by SHA-256, the same version as the pre-commit hook, findings redacted). Python jobs install with `uv sync --locked` and take Python from `.python-version`. Only pull request runs are cancelled by a newer push, so every commit on `main` is checked. No secrets: the token is read-only, checkout keeps no credentials, the test jobs run in demo mode with blank keys, and live tests stay deselected. Actions are pinned to commit SHAs. The workflow is checked without GitHub by `tests/test_ci_workflow.py` and by actionlint (`uvx --from actionlint-py==1.7.12.24 actionlint .github/workflows/ci.yml`). |
-| Publishing | No GitHub Pages for now (until the repository is made public). README is meant to show screenshots of the Telegram message and the dashboard; `docs/screenshots/` does not exist yet, so README shows the demo message as text and has no images. The repository stays private until the owner decides. |
+| Publishing | No GitHub Pages for now (until the repository is made public). README is meant to show screenshots of the Telegram message and the dashboard; `docs/screenshots/` does not exist yet, so README shows the demo message as text and has no images. The repository is private for now. |
 | Scheduling | The interface is `review-radar run` (or separate `ingest`/`analyze`/`summary`/`dashboard` jobs). Windows Task Scheduler and cron setup, exit codes, failure handling and the no-double-send rules are documented in [SCHEDULING.md](SCHEDULING.md), not automated. |
 
 ## Stages
@@ -106,63 +106,53 @@ Every reservation was replaced by the real cost (`settled`, both timestamps set)
 
 ## Review backlog (LOW findings)
 
-Recorded after each stage review; picked up in the stage named in brackets.
+Recorded after each stage review; picked up in the stage named in brackets. Items whose stage has
+passed and that are still listed are open. Fixed items are removed (they stay in the git history).
+
+**Summary:** 121 open LOW items (124 bullets minus three notes about carried-over items); every
+CRITICAL, HIGH and MEDIUM finding was fixed in its stage. The most important ones:
+
+1. `run` continues after an ingest that skipped rows, so a live summary can be sent from incomplete
+   data with exit 0 (stage 8).
+2. Nothing checks that ingest covered the whole period, so a partly loaded day looks complete
+   (stage 6).
+3. A locked database gives a misleading error, and there is no `busy_timeout` (stages 3 and 6).
+4. A set `ANTHROPIC_BASE_URL` only gets a warning; requests still go where it points (stage 9).
+5. No guard blocks real sockets or a real Anthropic client in the default tests (stage 5).
 
 ### Stage 1
 
-- ~~`models.py`: the topic validator accepts any iterable (`bytes`, `dict`, `set`); accept only `list | tuple` [5].~~ Done in stage 5.
-- ~~`models.py`: blank `external_id` / `source` are stored as-is; map blank strings to `None` [2].~~ Done in stage 2.
-- ~~`models.py`: `rating` accepts `True` (lax mode); use a strict int or rely on CSV ingest passing strings [2].~~ Done in stage 2.
 - `models.py`, `config.py`: validators take `value: Any`; use `object` for untrusted input [any].
 - `models.py`, `config.py`: public classes need one-line docstrings [any].
 - `config.py`: `REVIEW_RADAR_MODE` is case-sensitive (`LIVE` fails); lowercase and strip before validation [8].
-- ~~`config.py`: model names accept empty or whitespace values; add `min_length=1` with stripping [5].~~ Done in stage 5.
-- ~~`config.py`: non-blank secrets are not stripped (a pasted trailing newline breaks auth later) [5].~~ Done in stage 5.
 - `config.py`: log the resolved mode and database path when the CLI starts [8].
 - Tests: always build `Settings` with `_env_file=None`, so a developer's real `.env` is never read [all].
 - Tests: nothing asserts that `Settings` is frozen [any].
-- Tests contain `# type: ignore` comments but no type checker runs; add mypy/pyright to dev deps and checks, or drop the comments. After stage 9 the owner added mypy for `src` (the 8 errors are fixed, the lint job runs `uv run mypy src`); the tests are still not type-checked, so their `# type: ignore` comments stay unchecked [any].
+- Tests contain `# type: ignore` comments but no type checker runs; add mypy/pyright to dev deps and checks, or drop the comments. Since stage 9 mypy checks `src` (the 8 errors are fixed, the lint job runs `uv run mypy src`); the tests are still not type-checked, so their `# type: ignore` comments stay unchecked [any].
 - `pyproject.toml`: dependency floors are the newest releases (`pydantic>=2.14.4`, `pydantic-settings>=2.16.3`); lower them to the oldest versions actually needed [10].
 
 ### Stage 2
 
-- ~~`ingest.py`: no file-size cap before `read_bytes()`; add `MAX_FILE_BYTES` and raise `IngestError` above it [3].~~ Done in stage 3.
-- ~~`ingest.py`: a directory path gives "Permission denied" on Windows; check `is_file()` first and say "Not a file" [3].~~ Done in stage 3.
-- ~~`ingest.py`: with `--encoding utf-8` on a BOM file the error is a misleading "Missing required column"; strip a leading BOM after decoding [3].~~ Done in stage 3.
-- ~~`ingest.py`: a field over 131072 characters aborts the whole file; reword the message to say the field is too large [3].~~ Done in stage 3.
-- ~~`ingest.py`: the delimiter is sniffed with `str.splitlines()`, which splits on more characters than csv~~ Done in stage 3: sniffed from the first csv physical line (CRLF/LF), not `str.splitlines()`; a quoted header cell with a line break is still not handled.
-- ~~`ingest.py`: a trailing delimiter on data rows (Excel `;` exports) makes every row `wrong_field_count`; consider tolerating trailing empty cells [3].~~ Done in stage 3.
-- ~~`models.py`: `external_id` and `source` have no length limit; add `max_length` before they reach the database [3].~~ Done in stage 3.
 - `ingest.py`: after a recoverable malformed row, a contrived tail with an even number of quotes that still opens a quoted field could leave a bogus continuation row; it is usually counted as `wrong_field_count`, but could be imported if it happens to be a valid row. Accepted risk; revisit if real exports hit it [any].
-- ~~`cli.py`: `ingest` requires `--dry-run` until storage exists; make saving the default in stage 3 [3].~~ Done in stage 3.
-- ~~Storage: decide the idempotency key for re-imports (unique `external_id`, fallback hash of date + text + source for rows without an id) so re-running ingest never double-counts the daily summary [3].~~ Done in stage 3.
 - `MAX_TEXT_LENGTH` (2000 chars) is not tied to the token budget; revisit with the prompt [5].
 - Eval needs ground truth keyed by `review_id`, so it only runs on generator data; say so in the CLI help and README [8].
 - `scripts/generate_reviews.py`: `generate()` does not validate `n` and `days`; the two output files are not written atomically; the company name is hardcoded in one template [10].
 - `scripts/generate_reviews.py`, `ingest.py`: a few public classes and functions lack docstrings [any].
 - `tests/test_generate_reviews.py`: `import random` inside a test function [any].
-- ~~README: explain that ratings are deliberately noisy against sentiment, so a rating-based fallback scores lower in eval [10].~~ Done in stage 10.
 
 ### Stage 3
 
-- ~~`storage.py`: `count_reviews` / `list_reviews` do not wrap `sqlite3.Error` / `ValidationError` in `StorageError`; wrap them before a CLI caller uses them (pydantic messages can contain review text) [4].~~ Done in stage 4.
 - `storage.py`: a locked or read-only database is reported as "Cannot use ... as a database"; special-case locked/readonly messages and set `busy_timeout` [6].
-- ~~`storage.py`: a naive `now` is stored without a timezone; require aware datetimes or convert to UTC [4].~~ Done in stage 4.
 - `storage.py`: no option to report "same id, different content" on re-import [any].
 - `models.py`: `MAX_TEXT_LENGTH` lives in ingest; move it to `Review.text` `max_length` like the id/source limits [5].
 - `ingest.py`: the 20 MB cap does not bound the row count / memory for millions of tiny rows; consider a row cap or capped error list [any].
 - `ingest.py`: a UTF-8 BOM file read with `--encoding cp1251` still gives "Missing required column"; detect the raw BOM and suggest the default encoding [any].
 - `cli.py`: exit code is 0 even when most rows were skipped; consider `--strict` [8].
-- ~~`storage.py`: the database file holds review text and is created with default permissions; chmod 0o600 on POSIX [9].~~ Done in stage 9: a new file is created with mode 0o600 before `sqlite3.connect` (an existing file is not changed; the POSIX test runs in CI).
 - Tests: the real-db guard relies only on the `DATABASE_PATH` env fixture; add a check that fails if a test resolves to `data/review_radar.db` [any].
-- ~~`storage.py`: `PRAGMA foreign_keys = ON` and its test are unused until a foreign key exists [4].~~ Done in stage 4.
 - Tests: `test_corrupt_database_is_a_clean_error` does not assert the file name in the message [any].
 
 ### Stage 4
 
-- ~~`classifier.py`: `ClassifierError.reason` is free-form; validate `[a-z0-9_]{1,64}` and fall back to `unknown_error` before the live classifier prints it [5].~~ Done in stage 5.
-- ~~`analysis.py`: the `ClassifierError` message (text-free by contract) is discarded; log it at WARNING with the batch index [5].~~ Done in stage 5.
-- ~~`analysis.py`: no stop after a fatal reason (auth, quota); add a fatal-reason set and count the rest as skipped [5].~~ Done in stage 5.
 - `analysis.py`: `save_analyses`' inserted count is ignored; warn when it is lower than the batch [any].
 - `analysis.py`: the three count queries are not one snapshot; read them in one transaction [any].
 - `analysis.py`: `utc_stamp(now)` is called only for validation; compute the stamp once and pass it down [any].
@@ -177,7 +167,6 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `storage.py`: foreign keys are off on purpose; re-enable `PRAGMA foreign_keys = ON` together with the first foreign key [any].
 - `fixture_classifier.py`: `from_file` has no size cap and does not catch `RecursionError` [any].
 - `fixture_classifier.py`: `ValidationError` is listed next to its base `ValueError` [any].
-- ~~Tests: `conftest.py` does not pin `ANTHROPIC_MODEL` / `ANTHROPIC_COMPARE_MODEL`; pin them before the stage 5 cache key depends on them [5].~~ Done in stage 5.
 - Tests: the CLI rerun test proves zero work only via output counts; make classify raise on the second run [any].
 - `analysis.py`: the batch that raised is counted as `not_run` together with the batches after it; count it as `aborted` [any].
 - `storage.py`: `load_analyses` maps a stored unknown topic to `other` with a warning instead of raising "stored data is invalid" [6].
@@ -191,9 +180,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `anthropic_classifier.py`: after a transient give-up inside a split the sibling half is still tried [any].
 - `anthropic_classifier.py`: the docstring says missing ids are retried "as a smaller batch"; with all ids missing it is the same size [any].
 - `anthropic_classifier.py`: sentiment `Literal[...]` duplicates the `Sentiment` enum [any].
-- ~~`anthropic_classifier.py`: the SDK reads `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` from the environment; a stray base URL would send the key and texts elsewhere; pass `base_url` explicitly or warn [9].~~ Done in stage 9: `build_client` warns, naming only the variable; where requests go is unchanged.
 - `anthropic_classifier.py`: the docstring says the key is not stored; the SDK client holds it [any].
-- ~~README: `ANTHROPIC_LOG=debug` makes the SDK log request bodies (review text) [10].~~ Done in stage 10.
 - `cli.py`: fatal, aborted and partial failures all exit 1; consider distinct exit codes for stage 8 scheduling [8].
 - `cli.py` / `analysis.py` / classifier: the same fatal error is logged up to three times [any].
 - `cli.py`: `DEMO_PROVIDER = "fixture"` duplicates `FixtureClassifier.provider` [any].
@@ -207,7 +194,6 @@ Recorded after each stage review; picked up in the stage named in brackets.
 
 ### Stage 6
 
-- ~~`telegram.py`: `trust_env` stays on, so proxy and CA settings from the environment apply; a hostile `HTTPS_PROXY` plus `SSL_CERT_FILE` could read the token. Turning it off also disables proxies; owner decision [9].~~ Decided in stage 9, no behaviour change: `trust_env=True` is now explicit and tested. Whoever can set the process environment can already run code (`PYTHONPATH`, the venv), so turning it off adds no protection, while it would break a legitimate proxy that the Anthropic SDK honours anyway. `.env` values never reach the process environment, so a proxy can only come from the real environment; SCHEDULING.md says so.
 - `telegram.py`: a 2xx other than 200 counts as certainly not delivered; treat it as `unknown` [any].
 - `telegram.py`: `RecursionError` from a deeply nested reply is handled only by the CLI (`unexpected_error`); catch it in `_parse` [any].
 - `telegram.py`: `ConnectError` counts as not delivered; a proxy that fails after forwarding could make that wrong (theoretical) [any].
@@ -245,7 +231,6 @@ Recorded after each stage review; picked up in the stage named in brackets.
 
 ### Stage 8
 
-- ~~`cli.py`: `_run_steps` calls the command functions with positional arguments; a reordered option could pass `dry_run` to the wrong parameter. Use keywords [9].~~ Done in stage 9.
 - `cli.py`: `run` continues after an ingest that skipped rows, so a live summary can be sent from incomplete data with exit 0; treat skipped rows as a failure or warn [any].
 - `cli.py`: `eval` drops skipped CSV rows without a message; the cause shows only as failed reviews [any].
 - `cli.py`: estimate-only `eval` silently ignores `--report` [any].
@@ -253,7 +238,6 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - `cli.py`: the cost per 1,000 shows `$0` when money was spent but no review was analyzed; show `n/a` [any].
 - `evaluation.py`: cache read and write tokens are not priced; no request uses caching today [any].
 - `evaluation.py`: table cells escape only pipes and line breaks; also escape backslashes and validate ids and categories in `load_truth` [any].
-- ~~`evaluation.py`: `client: Any` and some untyped locals; use the existing protocol and annotations [9].~~ Done in stage 9 (`MessagesClient`).
 - `analysis.py`: `text_hashes` accepts a list with slow lookups; take a set [any].
 - Tests: no test covers an unpriced compare model [any].
 - `docs/EVAL.md`: regenerating the report replaces the hand-written analysis; write the generated part to its own file. The per-dataset cost behind the $0.1727 figure is not shown there [10].
@@ -275,11 +259,10 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - CI: `setup-uv` keeps its default cache; set `enable-cache: false` for stricter isolation of pull request runs [any].
 - CI: gitleaks scans the history reachable from the checked-out ref (the merge ref on a pull request), not other branches, and uses the default rules [any].
 - CI: a browser test that loses the module-level `browser` marker would leave the browser job with no tests (pytest exit 5, loud) and be skipped in the test job; no count guard [any].
-- Not done: refusing to start when `ANTHROPIC_BASE_URL` (or another SDK override) is set, or passing `base_url` explicitly; this changes behaviour and is an owner decision. Today it is a warning only.
+- Not done: refusing to start when `ANTHROPIC_BASE_URL` (or another SDK override) is set, or passing `base_url` explicitly; this would change behaviour and is not decided. Today it is a warning only.
 
 ### Stage 10
 
-- ~~`tests/test_docs.py`: the passport test requires every "My answer" field to stay empty, so it fails as soon as the owner writes answers; it also checks only the first line after the field [any].~~ Done before publishing: it checks the structure only (ten numbered questions, one answer field each).
 - `tests/test_docs.py`: the Mermaid check counts blocks only; no validator ran on the diagrams (fetching mermaid-cli was blocked), they were checked by reading [any].
 - README and ARCHITECTURE: "review text never appears in logs" is stated as absolute; it is the design and is tested for the main paths, but not proven for every exception message [any].
 - ARCHITECTURE: "the key is unwrapped once" holds for the Anthropic key; the bot token and chat id are unwrapped in `TelegramSender` on each send [any].
@@ -289,9 +272,4 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - README: say that the database holds the full review text and must not be shared or attached to issues, nor `.env` or `--verbose` output [any].
 - README: "CI runs on every push" means pushes to `main` and pull requests [any].
 - README: the CI badge and the `git clone` URL work for others only once the repository is public; they name the owner's GitHub account [publish].
-- README: the License section says the agents come from "another MIT-licensed project" without naming or linking everything-claude-code (CLAUDE.md links it) [publish].
 - Not done here: the code items tagged [10] in earlier sections (dependency floors, `generate_reviews.py` checks, splitting the generated part of EVAL.md); this stage changed documentation only.
-
-### First live run
-
-- ~~Eval: add a small fictional set of "hard" reviews with ground truth (sarcasm, mixed feelings, typos, very short texts) and report it separately in the Haiku vs Sonnet comparison, because the template-based sample is too easy to separate the models [8].~~ Done in stage 8.
