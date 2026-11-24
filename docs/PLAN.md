@@ -28,7 +28,7 @@ Input: a CSV file with reviews of a fictional company. Output:
 | Eval | `review-radar eval` scores predictions against ground truth on the regular sample and a fictional hard set (`data/eval`, labelled by an AI agent before any model saw it); `--compare` runs Haiku 5.5 and Sonnet 5.5. Results are in [EVAL.md](EVAL.md). The default stays Haiku 5.5: Sonnet is 19.5 times the price and its lead is not statistically reliable on this sample. Live mode only prints an estimate unless `--yes` is given. Spend is limited by `--max-cost` across runs: schema version 6 adds a `spend_ledger` table, the worst case of each call is written before the call and replaced by the real cost after it, so a crash or timeout can overstate the total but never understate it. Eval uses its own `<stem>-eval.db`. Sonnet 5.5 rejects `thinking: disabled`, so it uses `between_tools`. No fallback model is used, so a refusal counts as an error. |
 | Run | `review-radar run --demo` runs ingest, analyze, a dry-run summary and the dashboard on the sample in its own `<stem>-demo.db`, with no key, network or Telegram send. `review-radar run CSV` runs the same steps live and stops at the first failed step. |
 | CI | GitHub Actions on Ubuntu only (`.github/workflows/ci.yml`), four jobs: lint (ruff check, format check and `mypy src`), test (default pytest suite), browser (headless Chrome preinstalled on the runner, Playwright locked in the `browser` dependency group; `REVIEW_RADAR_REQUIRE_BROWSER=1` turns a missing browser into a failure instead of a silent skip) and gitleaks over the full git history (`fetch-depth: 0`, the release binary checked by SHA-256, the same version as the pre-commit hook, findings redacted). Python jobs install with `uv sync --locked` and take Python from `.python-version`. Only pull request runs are cancelled by a newer push, so every commit on `main` is checked. No secrets: the token is read-only, checkout keeps no credentials, the test jobs run in demo mode with blank keys, and live tests stay deselected. Actions are pinned to commit SHAs. The workflow is checked without GitHub by `tests/test_ci_workflow.py` and by actionlint (`uvx --from actionlint-py==1.7.12.24 actionlint .github/workflows/ci.yml`). |
-| Publishing | No GitHub Pages for now (until the repository is made public). README shows screenshots of the Telegram message and the dashboard from `docs/screenshots/` (the dashboard one is built from the demo data on a temporary database, light theme, 1280 px wide), plus the demo message as text. The repository is private for now. |
+| Publishing | The repository is public since 2026-11-24. No GitHub Pages: the dashboard is built locally. README shows screenshots of the Telegram message and the dashboard from `docs/screenshots/` (the dashboard one is built from the demo data on a temporary database, light theme, 1280 px wide), plus the demo message as text. |
 | Scheduling | The interface is `review-radar run` (or separate `ingest`/`analyze`/`summary`/`dashboard` jobs). Windows Task Scheduler and cron setup, exit codes, failure handling and the no-double-send rules are documented in [SCHEDULING.md](SCHEDULING.md), not automated. |
 
 ## Stages
@@ -109,7 +109,8 @@ Every reservation was replaced by the real cost (`settled`, both timestamps set)
 Recorded after each stage review; picked up in the stage named in brackets. Items whose stage has
 passed and that are still listed are open. Fixed items are removed (they stay in the git history).
 
-**Summary:** 121 open LOW items (124 bullets minus three notes about carried-over items); every
+**Summary:** 120 open LOW items (124 bullets minus three notes about carried-over items and one
+item marked done); every
 CRITICAL, HIGH and MEDIUM finding was fixed in its stage. The most important ones:
 
 1. `run` continues after an ingest that skipped rows, so a live summary can be sent from incomplete
@@ -271,5 +272,5 @@ CRITICAL, HIGH and MEDIUM finding was fixed in its stage. The most important one
 - ARCHITECTURE: the state diagram lists "4xx, refused connection" as certain failures; connect and pool timeouts are certain failures too [any].
 - README: say that the database holds the full review text and must not be shared or attached to issues, nor `.env` or `--verbose` output [any].
 - README: "CI runs on every push" means pushes to `main` and pull requests [any].
-- README: the CI badge and the `git clone` URL work for others only once the repository is public; they name the owner's GitHub account [publish].
+- Done 2026-11-24: README's CI badge and `git clone` URL work for others now that the repository is public [publish].
 - Not done here: the code items tagged [10] in earlier sections (dependency floors, `generate_reviews.py` checks, splitting the generated part of EVAL.md); this stage changed documentation only.
