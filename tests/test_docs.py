@@ -14,7 +14,12 @@ DOCS = list(dict.fromkeys([README, PASSPORT, ARCHITECTURE, *sorted((ROOT / "docs
 # [text](target) and ![alt](target); the target ends at whitespace or ")".
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
-CI_BADGE = "https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml/badge.svg"
+CI_BADGE = (
+    "https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml/badge.svg"
+    "?branch=main"
+)
+LICENSE = ROOT / "LICENSE"
+AGENTS_LICENSE = ".claude/agents/LICENSE-everything-claude-code.txt"
 
 
 def _text(path: Path) -> str:
@@ -61,11 +66,34 @@ def test_architecture_has_mermaid_diagrams_for_flow_schema_and_trust() -> None:
     assert re.search(r"^## Trust boundaries", text, re.MULTILINE)
 
 
-def test_passport_has_ten_questions_with_empty_answers() -> None:
+def test_passport_has_ten_questions_each_with_an_answer_field() -> None:
+    # Structure only: the author fills in the answers, so their content is not checked.
     text = _text(PASSPORT)
-    questions = re.findall(r"^## \d+\. .+$", text, re.MULTILINE)
-    answers = re.findall(r"^\*\*My answer:\*\*\n\n(.*)$", text, re.MULTILINE)
+    sections = re.split(r"^## (?=\d+\. )", text, flags=re.MULTILINE)[1:]
 
-    assert len(questions) == 10
-    assert len(answers) == 10
-    assert all(line.startswith(("---", "## ")) or line == "" for line in answers), answers
+    assert [int(s.split(".", 1)[0]) for s in sections] == list(range(1, 11))
+    for section in sections:
+        assert section.count("**My answer:**") == 1, section.splitlines()[0]
+
+
+def test_passport_question_3_asks_why_a_failure_is_not_cached() -> None:
+    text = _text(PASSPORT)
+
+    question = r"^## 3\. .+\n\nWhy must a failed result never be put in the cache\?$"
+
+    assert re.search(question, text, re.MULTILINE)
+
+
+def test_license_is_mit_held_by_the_github_account_only() -> None:
+    text = _text(LICENSE)
+
+    assert text.startswith("MIT License\n")
+    assert re.search(r"^Copyright \(c\) \d{4} izabellaglovatskaya$", text, re.MULTILINE)
+
+
+def test_readme_names_the_license_and_the_separate_agents_license() -> None:
+    text = _text(README)
+    section = text.split("## License", 1)[1]
+
+    assert "[LICENSE](LICENSE)" in section
+    assert f"({AGENTS_LICENSE})" in section

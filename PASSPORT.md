@@ -26,10 +26,9 @@ Which cases does this key handle badly?
 
 ---
 
-## 3. Fallback answers and the cache
+## 3. Failures and the cache
 
-In demo mode some answers come from simple rules instead of canned answers. In live mode some
-reviews fail. What is written to the cache in each case, and why?
+Why must a failed result never be put in the cache?
 
 **My answer:**
 

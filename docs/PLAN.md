@@ -279,7 +279,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 
 ### Stage 10
 
-- `tests/test_docs.py`: the passport test requires every "My answer" field to stay empty, so it fails as soon as the owner writes answers; it also checks only the first line after the field [any].
+- ~~`tests/test_docs.py`: the passport test requires every "My answer" field to stay empty, so it fails as soon as the owner writes answers; it also checks only the first line after the field [any].~~ Done before publishing: it checks the structure only (ten numbered questions, one answer field each).
 - `tests/test_docs.py`: the Mermaid check counts blocks only; no validator ran on the diagrams (fetching mermaid-cli was blocked), they were checked by reading [any].
 - README and ARCHITECTURE: "review text never appears in logs" is stated as absolute; it is the design and is tested for the main paths, but not proven for every exception message [any].
 - ARCHITECTURE: "the key is unwrapped once" holds for the Anthropic key; the bot token and chat id are unwrapped in `TelegramSender` on each send [any].
@@ -289,6 +289,7 @@ Recorded after each stage review; picked up in the stage named in brackets.
 - README: say that the database holds the full review text and must not be shared or attached to issues, nor `.env` or `--verbose` output [any].
 - README: "CI runs on every push" means pushes to `main` and pull requests [any].
 - README: the CI badge and the `git clone` URL work for others only once the repository is public; they name the owner's GitHub account [publish].
+- README: the License section says the agents come from "another MIT-licensed project" without naming or linking everything-claude-code (CLAUDE.md links it) [publish].
 - Not done here: the code items tagged [10] in earlier sections (dependency floors, `generate_reviews.py` checks, splitting the generated part of EVAL.md); this stage changed documentation only.
 
 ### First live run

@@ -1,6 +1,6 @@
 # Review Radar
 
-[![CI](https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml)
+[![CI](https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/izabellaglovatskaya/review-radar/actions/workflows/ci.yml?query=branch%3Amain)
 
 Review Radar reads customer reviews from a CSV file. An LLM labels each review with a sentiment
 and up to three complaint topics. The results go into a local SQLite database. From there the
@@ -226,3 +226,11 @@ More documents:
 - [docs/EVAL.md](docs/EVAL.md): the full model evaluation;
 - [docs/SCHEDULING.md](docs/SCHEDULING.md): running it every day;
 - [PASSPORT.md](PASSPORT.md): interview questions about the project.
+
+## License
+
+The project is under the MIT license, see [LICENSE](LICENSE).
+
+The review agents in `.claude/agents/` were copied from another MIT-licensed project. Their
+license is kept separately, in
+[.claude/agents/LICENSE-everything-claude-code.txt](.claude/agents/LICENSE-everything-claude-code.txt).
