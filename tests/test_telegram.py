@@ -265,3 +265,22 @@ class TestSecretsInLogs:
 
         assert TOKEN not in rendered
         assert CHAT_ID not in rendered
+
+
+class TestClientSettings:
+    def test_honours_proxy_environment_and_never_follows_redirects(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+        real_client = httpx2.Client
+
+        def recording_client(**kwargs: object) -> httpx2.Client:
+            captured.update(kwargs)
+            return real_client(**kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr("review_radar.telegram.httpx2.Client", recording_client)
+
+        assert sender(ok).send("hello") == 42
+
+        assert captured["trust_env"] is True
+        assert captured["follow_redirects"] is False

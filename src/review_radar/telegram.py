@@ -7,6 +7,8 @@ can quote the URL) stays attached to it.
 
 A send is never retried here: repeating a request whose outcome is unclear could deliver the
 summary twice. `DeliveryState` tells the caller whether a later run may safely send again.
+
+Proxy and CA environment variables are honoured (`trust_env=True`), as the Anthropic SDK does.
 """
 
 import logging
@@ -91,6 +93,10 @@ class TelegramSender:
                 transport=self._transport,
                 timeout=REQUEST_TIMEOUT_SECONDS,
                 follow_redirects=False,
+                # Honour proxy/CA variables: whoever controls the process environment can already
+                # run code (PYTHONPATH, the venv), so disabling this adds no protection and would
+                # break a legitimate proxy.
+                trust_env=True,
             ) as client:
                 response = client.post(f"{API_BASE}/bot{token}/sendMessage", json=payload)
         except (httpx2.ConnectError, httpx2.ConnectTimeout, httpx2.PoolTimeout):

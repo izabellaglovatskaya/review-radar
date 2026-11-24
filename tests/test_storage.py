@@ -1,9 +1,13 @@
 import contextlib
 import datetime as dt
+import logging
 import os
 import re
 import sqlite3
+import stat
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -644,3 +648,131 @@ class TestDedupKey:
         hash_key = dedup_key(make_review())
 
         assert dedup_key(make_review(external_id=hash_key)) != hash_key
+
+
+class TestNewDatabaseFilePermissions:
+    """A new database holds review text, so it is created owner-only (0o600)."""
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+    def test_new_file_is_owner_only_even_with_a_permissive_umask(self, tmp_path: Path) -> None:
+        old_umask = os.umask(0o022)
+        try:
+            path = db_path(tmp_path)
+            connect(path).close()
+        finally:
+            os.umask(old_umask)
+
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+    def test_requests_mode_0o600_for_a_new_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = db_path(tmp_path)
+        calls: list[tuple[int, int]] = []
+        real_open = os.open
+
+        def recording_open(
+            file: str | os.PathLike[str], flags: int, mode: int = 0o777, **kw: Any
+        ) -> int:
+            if Path(file) == path:
+                calls.append((flags, mode))
+            return real_open(file, flags, mode, **kw)
+
+        monkeypatch.setattr(storage.os, "open", recording_open)
+
+        connect(path).close()
+
+        assert len(calls) == 1
+        flags, mode = calls[0]
+        assert mode == 0o600
+        assert flags & os.O_CREAT
+        assert flags & os.O_EXCL
+
+    def test_an_existing_database_keeps_its_data(self, tmp_path: Path) -> None:
+        path = db_path(tmp_path)
+        with contextlib.closing(connect(path)) as conn:
+            save_reviews(conn, [make_review()])
+
+        with contextlib.closing(connect(path)) as conn:
+            assert count_reviews(conn) == 1
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+    def test_an_existing_file_keeps_its_mode(self, tmp_path: Path) -> None:
+        path = db_path(tmp_path)
+        connect(path).close()
+        path.chmod(0o640)
+
+        connect(path).close()
+
+        assert stat.S_IMODE(path.stat().st_mode) == 0o640
+
+    def test_a_new_folder_is_requested_owner_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "new-folder" / "test.db"
+        modes: list[int] = []
+        real_mkdir = Path.mkdir
+
+        def recording_mkdir(self: Path, mode: int = 0o777, **kw: Any) -> None:
+            if self == path.parent:
+                modes.append(mode)
+            real_mkdir(self, mode, **kw)
+
+        monkeypatch.setattr(Path, "mkdir", recording_mkdir)
+
+        connect(path).close()
+
+        assert modes == [0o700]
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+    def test_a_new_folder_is_owner_only(self, tmp_path: Path) -> None:
+        path = tmp_path / "new-folder" / "test.db"
+        old_umask = os.umask(0o022)
+        try:
+            connect(path).close()
+        finally:
+            os.umask(old_umask)
+
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+
+    @pytest.mark.parametrize(
+        ("mode", "shared"), [(0o600, False), (0o400, False), (0o640, True), (0o604, True)]
+    )
+    def test_group_or_other_bits_count_as_shared(self, mode: int, shared: bool) -> None:
+        assert storage.readable_by_others(mode) is shared
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+    def test_warns_when_an_existing_database_is_readable_by_others(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        path = db_path(tmp_path)
+        connect(path).close()
+        path.chmod(0o644)
+
+        with caplog.at_level(logging.WARNING, logger="review_radar"):
+            connect(path).close()
+
+        assert f"chmod 600 {path.name}" in caplog.text
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644  # warned, never changed
+
+    def test_no_warning_for_a_private_database(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        path = db_path(tmp_path)
+        connect(path).close()
+
+        with caplog.at_level(logging.WARNING, logger="review_radar"):
+            connect(path).close()
+
+        assert caplog.records == []
+
+    def test_an_os_error_while_creating_is_reported_without_the_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def failing_open(*_args: object, **_kwargs: object) -> int:
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(storage.os, "open", failing_open)
+
+        with pytest.raises(StorageError, match="Cannot open the database: Permission denied"):
+            connect(db_path(tmp_path))

@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
+from anthropic.types import Message
 
+from review_radar.anthropic_classifier import MessagesClient
 from review_radar.classifier import FatalClassifierError
 from review_radar.config import PROJECT_ROOT
 from review_radar.models import Sentiment, Topic, Usage
@@ -346,7 +348,7 @@ class SpendGuard:
 class GuardedClient:
     """Wraps an Anthropic client: refuses any call whose worst case could pass the limit."""
 
-    def __init__(self, client: Any, guard: SpendGuard, model: str) -> None:
+    def __init__(self, client: MessagesClient, guard: SpendGuard, model: str) -> None:
         if model not in PRICES_PER_MTOK:
             raise EvalError(f"No price is known for the model {model}.")
         self._client = client
@@ -357,9 +359,9 @@ class GuardedClient:
     def messages(self) -> "GuardedClient":
         return self
 
-    def create(self, **kwargs: Any) -> Any:
+    def create(self, **kwargs: Any) -> Message:
         """Check the limit, forward the call unchanged and count what it really used."""
-        worst = _price(
+        worst: Decimal = _price(
             self._model,
             Usage(input_tokens=_input_bound(kwargs), output_tokens=int(kwargs["max_tokens"])),
         )
@@ -367,7 +369,7 @@ class GuardedClient:
             raise FatalClassifierError(
                 "budget_exceeded", "The evaluation spend limit stopped this call."
             )
-        entry = self._guard.reserve(self._model, worst)
+        entry: int | None = self._guard.reserve(self._model, worst)
         try:
             response = self._client.messages.create(**kwargs)
         except anthropic.APIStatusError:  # the API answered with an error: nothing to bill
@@ -375,12 +377,14 @@ class GuardedClient:
             raise
         # Any other exception (timeout, broken connection, unreadable reply) may have been
         # billed, so the reservation stays.
-        reported = getattr(response, "usage", None)
+        reported: Any = getattr(response, "usage", None)
         if reported is None:
             logger.warning("A response had no usage; its worst-case cost stays on the books")
             self._guard.settle(entry, worst, worst)
             return response
-        usage = Usage(input_tokens=reported.input_tokens, output_tokens=reported.output_tokens)
+        usage: Usage = Usage(
+            input_tokens=reported.input_tokens, output_tokens=reported.output_tokens
+        )
         self._guard.settle(entry, worst, _price(self._model, usage), usage)
         return response
 

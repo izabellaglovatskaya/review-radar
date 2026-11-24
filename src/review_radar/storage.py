@@ -29,10 +29,13 @@ version 1 database cannot be upgraded in place and must be recreated from the CS
 to 5 are upgraded.
 """
 
+import contextlib
 import datetime as dt
 import json
 import logging
+import os
 import sqlite3
+import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -323,7 +326,9 @@ def connect(path: Path) -> sqlite3.Connection:
     The caller owns the connection and must close it (e.g. with `contextlib.closing`).
     """
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _create_private_file(path)
+        _warn_if_shared(path)
         conn = sqlite3.connect(path)
     except (sqlite3.Error, OSError) as exc:
         raise StorageError(f"Cannot open the database: {_reason(exc)}.") from None
@@ -336,6 +341,31 @@ def connect(path: Path) -> sqlite3.Connection:
         conn.close()
         raise
     return conn
+
+
+def _create_private_file(path: Path) -> None:
+    """Create an empty database file with mode 0o600 if it does not exist (never chmod one).
+
+    Creating it before `sqlite3.connect` leaves no window with default permissions. On Windows
+    the mode has little effect.
+    """
+    with contextlib.suppress(FileExistsError):
+        os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+
+
+def readable_by_others(mode: int) -> bool:
+    """True when group or other users have any permission bit on the file."""
+    return bool(mode & 0o077)
+
+
+def _warn_if_shared(path: Path) -> None:
+    """Warn (never chmod) when an older database file is open to other users (POSIX only)."""
+    if sys.platform != "win32" and readable_by_others(path.stat().st_mode):
+        logger.warning(
+            "%s can be read by other users and holds review text; run: chmod 600 %s",
+            path.name,
+            path.name,
+        )
 
 
 def _reason(exc: Exception) -> str:

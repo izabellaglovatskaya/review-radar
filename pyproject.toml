@@ -17,11 +17,15 @@ dependencies = [
 review-radar = "review_radar.cli:app"
 
 [dependency-groups]
+browser = [
+    "playwright==1.65.2",
+]
 dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "ruff>=0.9",
     "pre-commit>=4.0",
+    "pyyaml>=6.0",
 ]
 
 [build-system]
@@ -49,7 +53,7 @@ pythonpath = ["scripts"]
 addopts = "-ra --strict-markers --cov --cov-report=term-missing -m 'not live and not browser'"
 markers = [
     "live: calls a real model or API; opt-in with -m live",
-    "browser: runs the page in a local Chrome; opt-in with uv run --with playwright pytest -m browser",
+    "browser: runs the page in a local Chrome; opt-in with uv run --group browser pytest -m browser --no-cov",
 ]
 
 [tool.coverage.run]

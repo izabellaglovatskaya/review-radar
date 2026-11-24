@@ -791,15 +791,27 @@ def _run_steps(
 ) -> None:
     if csv_path is None:  # pragma: no cover (run_command guarantees a path)
         raise typer.BadParameter("A CSV path is required.")
-    _step("ingest", lambda: ingest(csv_path, None, "utf-8-sig", False))
-    _step("analyze", lambda: analyze(None, None))
+
+    def ingest_csv() -> None:
+        ingest(path=csv_path, delimiter=None, encoding="utf-8-sig", dry_run=False)
+
+    _step("ingest", ingest_csv)
+    _step("analyze", lambda: analyze(limit=None, max_calls=None))
 
     def summarize() -> None:
         day = date if date is not None or not dry_run else _latest_day()
-        summary_command(day, None, None, dry_run, False, False, False)
+        summary_command(
+            date=day,
+            start=None,
+            end=None,
+            dry_run=dry_run,
+            force=False,
+            allow_partial=False,
+            allow_empty=False,
+        )
 
     _step("summary", summarize)
-    _step("dashboard", lambda: dashboard_command(out))
+    _step("dashboard", lambda: dashboard_command(out=out))
 
 
 def _latest_day() -> dt.datetime | None:

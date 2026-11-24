@@ -46,6 +46,7 @@ one place (building the SDK client); this class does not keep it (the SDK client
 import hashlib
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import Callable, Sequence
@@ -157,8 +158,49 @@ def thinking_config(model: str) -> dict[str, str]:
     return {"type": "between_tools" if model in _BETWEEN_TOOLS_MODELS else "disabled"}
 
 
+# Environment variables the SDK reads on its own, each with the value that makes it risky (None:
+# any non-blank value) and the warning. Only the name is logged: a value may hold credentials.
+_SDK_ENV_WARNINGS: tuple[tuple[str, str | None, str], ...] = (
+    (
+        "ANTHROPIC_BASE_URL",
+        None,
+        "ANTHROPIC_BASE_URL is set: requests and the API key go to that address "
+        "instead of the default API.",
+    ),
+    (
+        "ANTHROPIC_AUTH_TOKEN",
+        None,
+        "ANTHROPIC_AUTH_TOKEN is set: the SDK also sends it as a bearer token.",
+    ),
+    (
+        "ANTHROPIC_CUSTOM_HEADERS",
+        None,
+        "ANTHROPIC_CUSTOM_HEADERS is set: the SDK adds those headers to every request.",
+    ),
+    (
+        "ANTHROPIC_LOG",
+        "debug",
+        "ANTHROPIC_LOG=debug is set: the SDK logs request bodies, which hold review text.",
+    ),
+    (
+        "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE",
+        "content",
+        "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE=content is set: traces can hold review text.",
+    ),
+)
+
+
+def _warn_about_sdk_environment() -> None:
+    """Warn, by variable name only, about SDK settings that redirect requests or leak text."""
+    for name, risky, warning in _SDK_ENV_WARNINGS:
+        value = os.environ.get(name, "").strip()
+        if value and (risky is None or value.lower() == risky):
+            logger.warning(warning)
+
+
 def build_client(api_key: SecretStr) -> anthropic.Anthropic:
     """The SDK client; the only place the key is unwrapped. Retries are ours, so it gets none."""
+    _warn_about_sdk_environment()
     return anthropic.Anthropic(
         api_key=api_key.get_secret_value(), max_retries=0, timeout=REQUEST_TIMEOUT
     )

@@ -1,6 +1,7 @@
-"""The built page in a real headless Chrome. Opt-in: `uv run --with playwright pytest -m browser`.
+"""The built page in a real headless Chrome. Opt-in: `uv run --group browser pytest -m browser`.
 
-Needs a local Chrome. Skipped when Playwright or Chrome is missing.
+Needs a local Chrome. Skipped when Playwright or Chrome is missing, unless
+`REVIEW_RADAR_REQUIRE_BROWSER=1` (set in CI) makes that a failure.
 """
 
 from collections.abc import Callable, Iterator
@@ -8,7 +9,12 @@ from pathlib import Path
 
 import pytest
 
-sync_api = pytest.importorskip("playwright.sync_api")
+from browser_support import unavailable
+
+try:
+    from playwright import sync_api
+except ImportError:
+    unavailable("Playwright is not installed")
 
 from review_radar.dashboard import (  # noqa: E402
     DashboardData,
@@ -89,7 +95,7 @@ def browser() -> Iterator["sync_api.Browser"]:
         try:
             launched = playwright.chromium.launch(channel="chrome", headless=True)
         except sync_api.Error as exc:
-            pytest.skip(f"Chrome is not available: {str(exc).splitlines()[0]}")
+            unavailable(f"Chrome is not available: {str(exc).splitlines()[0]}")
         try:
             yield launched
         finally:
